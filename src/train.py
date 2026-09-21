@@ -20,7 +20,8 @@ from transformers import (AutoConfig, AutoModelForQuestionAnswering,
                           DataCollatorWithPadding, Trainer, TrainingArguments)
 
 from .common import (EpochTimer, MODELS, RunRecord, Stopwatch, apply_adaptation,
-                     count_params, get_device, head_param_count, param_groups, set_seed)
+                     count_params, free_device_memory, get_device, head_param_count,
+                     param_groups, precision_flags, set_seed)
 from .data import TaskData, dataset_card, load_task
 from .encoding import MAX_LEN, tokenize_task
 from .metrics import (decode_token_predictions, ner_metrics, pos_metrics,
@@ -168,6 +169,7 @@ def _qa_datasets(td: TaskData, tokenizer):
 
 def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
         head: str = "linear", epochs: float = 3, batch_size: int = 32,
+        grad_accum: int = 1,
         head_lr: float = 1e-3, body_lr: float = 2e-5, weight_decay: float = 0.01,
         warmup_ratio: float = 0.1, seed: int = 42, run_id: str | None = None,
         save_model: bool = False, eval_batch_size: int | None = None,
@@ -215,10 +217,11 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
         output_dir=str(out_dir), overwrite_output_dir=True,
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size, per_device_eval_batch_size=eval_batch_size,
+        gradient_accumulation_steps=grad_accum,
         learning_rate=head_lr, weight_decay=weight_decay, warmup_ratio=warmup_ratio,
         lr_scheduler_type="linear", eval_strategy="epoch", save_strategy="no",
         logging_strategy="steps", logging_steps=50, report_to=[], seed=seed,
-        data_seed=seed, bf16=(device.type in {"mps", "cuda"}), dataloader_num_workers=0,
+        data_seed=seed, **precision_flags(), dataloader_num_workers=0,
         disable_tqdm=False, label_names=(["start_positions", "end_positions"]
                                          if td.kind == "qa" else None),
     )
@@ -266,14 +269,22 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
 
     rec = RunRecord(
         task=task, run_id=run_id, method=method, model_name=model_name, head=head,
-        hyperparams={"epochs": epochs, "batch_size": batch_size, "head_lr": head_lr,
+        hyperparams={"epochs": epochs, "batch_size": batch_size,
+                     "grad_accum": grad_accum,
+                     "effective_batch_size": batch_size * grad_accum, "head_lr": head_lr,
                      "body_lr": body_lr if method != "frozen" else None,
                      "weight_decay": weight_decay, "warmup_ratio": warmup_ratio,
-                     "max_length": MAX_LEN[task], "bf16": args.bf16,
+                     "max_length": MAX_LEN[task], "bf16": args.bf16, "fp16": args.fp16,
                      "scheduler": "linear with 10% warmup"},
         params=params, metrics=metrics,
         train_log=[d for d in trainer.state.log_history],
         epoch_times=timer.epochs, train_seconds=sw_train.seconds, eval_seconds=sw_eval.seconds,
         dataset=dataset_card(td), seed=seed, notes=notes)
     rec.save()
+
+    # Release the device allocation before the next run in the same process. Without this
+    # the MPS cache grows across a long grid until the machine swaps and a step that took
+    # a second takes minutes.
+    del trainer, model
+    free_device_memory()
     return rec

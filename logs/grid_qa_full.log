@@ -1,0 +1,15 @@
+[grid] 3 runs
+
+[1/3] {'task': 'qa', 'kind': 'train', 'method': 'frozen', 'head': 'linear', 'epochs': 3, 'batch_size': 16, 'head_lr': 0.001}
+skip   qa      frozen_linear_bert-base-uncased
+
+[2/3] {'task': 'qa', 'kind': 'train', 'method': 'partial_ft4', 'head': 'linear', 'epochs': 2, 'batch_size': 16, 'head_lr': 0.001, 'body_lr': 3e-05}
+skip   qa      partial_ft4_linear_bert-base-uncased
+
+[3/3] {'task': 'qa', 'kind': 'train', 'method': 'full_ft', 'head': 'linear', 'epochs': 2, 'batch_size': 8, 'grad_accum': 2, 'eval_batch_size': 16, 'head_lr': 0.001, 'body_lr': 3e-05}
+Some weights of BertForQuestionAnswering were not initialized from the model checkpoint at bert-base-uncased and are newly initialized: ['qa_outputs.bias', 'qa_outputs.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+  0%|          | 0/1894 [00:00<?, ?it/s]/Users/joseangel/Developer/Trends in DS/U2T01. Adapting BERT for NLP tasks/.venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.
+  super().__init__(loader)
+  0%|          | 1/1894 [00:12<6:26:51, 12.26s/it]  0%|          | 2/1894 [00:15<3:46:07,  7.17s/it]  0%|          | 3/1894 [00:18<2:37:37,  5.00s/it]  0%|          | 4/1894 [00:21<2:16:09,  4.32s/it]  0%|          | 5/1894 [00:25<2:12:25,  4.21s/it]  0%|          | 6/1894 [00:28<1:59:05,  3.78s/it]  0%|          | 7/1894 [00:40<3:23:01,  6.46s/it]/opt/homebrew/Cellar/python@3.12/3.12.13_2/Frameworks/Python.framework/Versions/3.12/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

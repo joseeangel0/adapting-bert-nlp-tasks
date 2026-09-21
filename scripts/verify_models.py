@@ -27,7 +27,7 @@ from transformers import (AutoTokenizer, DataCollatorForTokenClassification,  # 
                           DataCollatorWithPadding, Trainer, TrainingArguments)
 
 from src import qa_utils  # noqa: E402
-from src.common import MODELS, get_device  # noqa: E402
+from src.common import MODELS, get_device, precision_flags  # noqa: E402
 from src.data import load_task  # noqa: E402
 from src.encoding import tokenize_task  # noqa: E402
 from src.train import load_run_model  # noqa: E402
@@ -43,7 +43,7 @@ def evaluate_checkpoint(task: str, path: Path) -> dict:
     td = load_task(task)
     tokenizer = AutoTokenizer.from_pretrained(str(path))
     args = TrainingArguments(output_dir="/tmp/verify", per_device_eval_batch_size=64,
-                             report_to=[], bf16=(device.type in {"mps", "cuda"}),
+                             report_to=[], **precision_flags(),
                              dataloader_num_workers=0,
                              label_names=(["start_positions", "end_positions"]
                                           if td.kind == "qa" else None))

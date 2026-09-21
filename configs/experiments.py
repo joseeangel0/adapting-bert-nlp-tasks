@@ -54,8 +54,12 @@ GRID = [
          epochs=3, batch_size=16, head_lr=1e-3),
     dict(task="qa", kind="train", method="partial_ft4", head="linear",
          epochs=2, batch_size=16, head_lr=1e-3, body_lr=3e-5),
+    # Full fine-tuning at sequence length 384 is the heaviest run in the grid. Batch 8 with
+    # two accumulation steps keeps the effective batch at 16 - identical optimiser maths, since
+    # there is no batch normalisation anywhere in BERT - on roughly half the activation memory.
     dict(task="qa", kind="train", method="full_ft", head="linear",
-         epochs=2, batch_size=16, head_lr=1e-3, body_lr=3e-5),
+         epochs=2, batch_size=8, grad_accum=2, eval_batch_size=16,
+         head_lr=1e-3, body_lr=3e-5),
 ]
 
 # Optional size benchmark, only if there is compute left (Part 1, "optional benchmarks").

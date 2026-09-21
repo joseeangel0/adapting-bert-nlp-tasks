@@ -21,7 +21,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from transformers import AutoModel, AutoTokenizer
 
-from .common import CACHE, RunRecord, Stopwatch, get_device, set_seed
+from .common import CACHE, RunRecord, Stopwatch, autocast_dtype, get_device, set_seed
 from .data import TaskData, dataset_card, load_task
 from .encoding import IGNORE, MAX_LEN, align_labels
 from .metrics import ner_metrics, pos_metrics, sequence_metrics
@@ -56,6 +56,7 @@ def extract(td: TaskData, split: str, model_name: str, batch_size: int = 64,
     attn = {"attn_implementation": "eager"} if device.type == "mps" else {}
     body = AutoModel.from_pretrained(model_name, **attn).to(device).eval()
 
+    amp_dtype = autocast_dtype()
     data = td.splits[split]
     feats, labels, lens = [], [], []
     for start in range(0, len(data), batch_size):
@@ -63,7 +64,8 @@ def extract(td: TaskData, split: str, model_name: str, batch_size: int = 64,
         if td.kind == "sequence":
             enc = tokenizer(batch[td.text_key], truncation=True, max_length=MAX_LEN[td.name],
                             padding=True, return_tensors="pt").to(device)
-            with torch.autocast(device.type, dtype=torch.bfloat16, enabled=device.type != "cpu"):
+            with torch.autocast(device.type, dtype=amp_dtype or torch.float32,
+                                enabled=amp_dtype is not None):
                 hidden = body(**enc).last_hidden_state.float()
             if pooling == "cls":
                 vec = hidden[:, 0]
@@ -78,7 +80,8 @@ def extract(td: TaskData, split: str, model_name: str, batch_size: int = 64,
                             max_length=MAX_LEN[td.name], padding=True, return_tensors="pt")
             word_ids = [enc.word_ids(i) for i in range(len(batch[td.text_key]))]
             enc_dev = {k: v.to(device) for k, v in enc.items()}
-            with torch.autocast(device.type, dtype=torch.bfloat16, enabled=device.type != "cpu"):
+            with torch.autocast(device.type, dtype=amp_dtype or torch.float32,
+                                enabled=amp_dtype is not None):
                 hidden = body(**enc_dev).last_hidden_state.float().cpu().numpy()
             for i, wids in enumerate(word_ids):
                 aligned = align_labels(wids, batch[td.label_key][i])

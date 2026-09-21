@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src import feature_based, train           # noqa: E402
-from src.common import RESULTS                 # noqa: E402
+from src.common import RESULTS, free_device_memory  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("experiments", ROOT / "configs" / "experiments.py")
 EXP = importlib.util.module_from_spec(spec)
@@ -47,6 +47,7 @@ def execute(cfg: dict, force: bool = False, limit: int | None = None) -> str:
         rec = train.run(task, kwargs.pop("method"), save_model=True, **kwargs)
     dt = time.perf_counter() - t0
     head = {k: v for k, v in rec.metrics.items() if isinstance(v, (int, float))}
+    free_device_memory()
     return f"done   {task:7s} {rid}  [{dt/60:.1f} min]  {head}"
 
 

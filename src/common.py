@@ -40,6 +40,44 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
+def precision_flags() -> dict[str, bool]:
+    """Mixed precision that the device actually supports.
+
+    MPS takes bfloat16 and roughly doubles throughput. On CUDA, bfloat16 needs Ampere or
+    newer - a P100 or T4 does not have it, and asking for it makes TrainingArguments refuse
+    to start - so those fall back to float16.
+    """
+    dev = get_device()
+    if dev.type == "mps":
+        return {"bf16": True, "fp16": False}
+    if dev.type == "cuda":
+        bf16 = torch.cuda.is_bf16_supported()
+        return {"bf16": bf16, "fp16": not bf16}
+    return {"bf16": False, "fp16": False}
+
+
+def autocast_dtype() -> torch.dtype | None:
+    """The dtype to run frozen-feature extraction under, or None to stay in float32."""
+    flags = precision_flags()
+    return torch.bfloat16 if flags["bf16"] else (torch.float16 if flags["fp16"] else None)
+
+
+def free_device_memory() -> None:
+    """Drop cached device allocations between runs.
+
+    A grid runs many experiments in one process; on MPS the allocator keeps freed blocks
+    cached, and across twenty runs that grew until the machine swapped and training slowed
+    by two orders of magnitude.
+    """
+    import gc
+
+    gc.collect()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    elif torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def environment_info() -> dict[str, Any]:
     dev = get_device()
     info = {
