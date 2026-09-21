@@ -46,16 +46,18 @@ plt.rcParams.update({
 
 
 def _clean(ax, xgrid=True):
-    ax.grid(axis="x" if xgrid else "y", color=RULE, linewidth=0.6, zorder=0)
+    if xgrid is not None:
+        ax.grid(axis="x" if xgrid else "y", color=RULE, linewidth=0.6, zorder=0)
     ax.set_axisbelow(True)
     ax.tick_params(length=0)
 
 
-def _legend(fig, used, **kw):
+def _legend(fig, used, bbox_to_anchor=(0.5, -0.02)):
+    """Identity is never colour alone: a legend for every multi-series figure."""
     handles = [plt.Line2D([], [], marker="o", linestyle="none", markersize=6.5,
                           color=RUNG_COLOR[r], label=RUNGS[r]) for r in used]
     fig.legend(handles=handles, loc="lower center", ncol=len(handles),
-               bbox_to_anchor=(0.5, -0.02), handletextpad=0.3, columnspacing=1.6, **kw)
+               bbox_to_anchor=bbox_to_anchor, handletextpad=0.3, columnspacing=1.6)
 
 
 # --------------------------------------------------------------------------- #
@@ -72,7 +74,9 @@ def fig_ladder(data):
         for i, r in enumerate(rs):
             c = RUNG_COLOR[r["rung"]]
             used.append(r["rung"])
-            ax.plot([0, r["headline"]], [i, i], color=c, alpha=0.22, linewidth=2, zorder=1)
+            # A Cleveland guide rule spanning the panel, not a 0-to-value connector: the dot's
+            # position carries the score, and nothing here should read as a bar length.
+            ax.axhline(i, color=RULE, linewidth=0.7, linestyle=(0, (1, 2.5)), zorder=1)
             ax.plot(r["headline"], i, "o", color=c, markersize=8,
                     markeredgecolor=SURFACE, markeredgewidth=1.4, zorder=3)
             ax.annotate(f"{r['headline']:.1f}", (r["headline"], i), xytext=(9, 0),
@@ -86,7 +90,7 @@ def fig_ladder(data):
         ax.set_ylim(-0.7, len(rs) - 0.3)
         ax.set_xlabel(HEADLINE[task][1] + " (%)")
         ax.set_title(TASK_TITLES[task], loc="left", color=INK, fontweight="bold", pad=7)
-        _clean(ax)
+        _clean(ax, xgrid=None)
     _legend(fig, list(dict.fromkeys(["frozen", "partial", "full"])))
     fig.tight_layout(h_pad=2.4, w_pad=3.0)
     fig.savefig(OUT / "ladder.png")
@@ -127,7 +131,17 @@ def fig_curves(data):
     fig, axes = plt.subplots(2, 4, figsize=(11.2, 5.0))
     for col, task in enumerate(TASK_ORDER):
         rs = [r for r in data if r["task"] == task and r["raw"].get("train_log")]
+        # One line per rung - the best run of each - so colour identifies the method 1:1.
+        # Several same-coloured lines in a panel would make identity unreadable.
+        best: dict[str, dict] = {}
+        for r in rs:
+            if r["headline"] is not None and (r["rung"] not in best
+                                              or r["headline"] > best[r["rung"]]["headline"]):
+                best[r["rung"]] = r
+        rs = [best[k] for k in ("frozen", "partial", "full") if k in best]
         ax_loss, ax_score = axes[0][col], axes[1][col]
+        if not rs:
+            ax_loss.axis("off"); ax_score.axis("off"); continue
         key = {"agnews": "eval_accuracy", "ner": "eval_entity_f1",
                "pos": "eval_token_accuracy", "qa": "eval_f1"}[task]
         for r in rs:

@@ -32,7 +32,7 @@ GRID = [
          epochs=2, batch_size=32, head_lr=1e-3, body_lr=2e-5),
 
     # ---------------- CoNLL-2003: named entity recognition ----------------------- #
-    dict(task="ner", kind="feature", estimator="logreg", pooling="cls"),
+    dict(task="ner", kind="feature", estimator="logreg"),
     dict(task="ner", kind="train", method="frozen", head="linear",
          epochs=5, batch_size=32, head_lr=1e-3),
     dict(task="ner", kind="train", method="partial_ft4", head="linear",
@@ -41,7 +41,7 @@ GRID = [
          epochs=3, batch_size=32, head_lr=1e-3, body_lr=2e-5),
 
     # ---------------- UD English-EWT: part-of-speech tagging --------------------- #
-    dict(task="pos", kind="feature", estimator="logreg", pooling="cls"),
+    dict(task="pos", kind="feature", estimator="logreg"),
     dict(task="pos", kind="train", method="frozen", head="linear",
          epochs=5, batch_size=32, head_lr=1e-3),
     dict(task="pos", kind="train", method="partial_ft2", head="linear",
@@ -70,6 +70,9 @@ OPTIONAL = [
 def run_id(cfg: dict) -> str:
     body = cfg.get("model_name", BODY).split("/")[-1]
     if cfg["kind"] == "feature":
-        return f"frozen_sk-{cfg['estimator']}_{cfg.get('pooling', 'cls')}_{body}"
+        # Pooling only means something for sequence classification; token tasks always use
+        # the first-subword vector, and a run id saying "cls" would suggest otherwise.
+        pool = cfg.get("pooling", "cls") if cfg["task"] == "agnews" else "firstsub"
+        return f"frozen_sk-{cfg['estimator']}_{pool}_{body}"
     suffix = "-pooler" if cfg.get("pooler_as_head") else ""
     return f"{cfg['method']}_{cfg.get('head', 'linear')}{suffix}_{body}"

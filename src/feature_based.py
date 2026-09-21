@@ -23,17 +23,28 @@ from transformers import AutoModel, AutoTokenizer
 
 from .common import CACHE, RunRecord, Stopwatch, get_device, set_seed
 from .data import TaskData, dataset_card, load_task
-from .encoding import MAX_LEN, align_labels
+from .encoding import IGNORE, MAX_LEN, align_labels
 from .metrics import ner_metrics, pos_metrics, sequence_metrics
 
 MAX_TRAIN_TOKENS = 150_000   # cap for token tasks, keeps the sklearn fit in minutes
+
+# Parameter counts of the frozen bodies, so a feature-based run can report what it did *not*
+# train without paying to load the weights again.
+BODY_PARAMS = {"bert-base-uncased": 109_482_240, "distilbert-base-uncased": 66_362_880,
+               "bert-large-uncased": 335_141_888}
 
 
 @torch.no_grad()
 def extract(td: TaskData, split: str, model_name: str, batch_size: int = 64,
             pooling: str = "cls") -> tuple[np.ndarray, np.ndarray, list[int]]:
-    """Return (features, labels, sentence_lengths). Cached on disk by (task, model, split)."""
-    tag = f"{td.name}_{model_name.split('/')[-1]}_{split}_{pooling}_{len(td.splits[split])}"
+    """Return (features, labels, sentence_lengths). Cached on disk by (task, model, split).
+
+    `pooling` applies to sequence classification only. Token-level tasks always take the
+    *first-subword* vector of each word - the same position the -100 convention puts the
+    label on - so features and labels are aligned by construction.
+    """
+    pool_tag = pooling if td.kind == "sequence" else "firstsub"
+    tag = f"{td.name}_{model_name.split('/')[-1]}_{split}_{pool_tag}_{len(td.splits[split])}"
     path = CACHE / f"{tag}.npz"
     if path.exists():
         z = np.load(path)
@@ -71,7 +82,7 @@ def extract(td: TaskData, split: str, model_name: str, batch_size: int = 64,
                 hidden = body(**enc_dev).last_hidden_state.float().cpu().numpy()
             for i, wids in enumerate(word_ids):
                 aligned = align_labels(wids, batch[td.label_key][i])
-                keep = [k for k, lab in enumerate(aligned) if lab != -100]
+                keep = [k for k, lab in enumerate(aligned) if lab != IGNORE]
                 feats.append(hidden[i, keep].astype(np.float16))
                 labels.extend(aligned[k] for k in keep)
                 lens.append(len(keep))
@@ -147,7 +158,7 @@ def run(task: str, estimator: str = "logreg", model_name: str = "bert-base-uncas
         head=f"sklearn:{estimator}",
         hyperparams={"estimator": estimator, "pooling": pooling,
                      "params": clf.get_params(), "max_length": MAX_LEN[task]},
-        params={"total_params": 109_482_240, "trainable_params": 0,
+        params={"total_params": BODY_PARAMS.get(model_name), "trainable_params": 0,
                 "trainable_pct": 0.0, "learner_params": n_params,
                 "note": "0 BERT parameters updated; the learner sits on top of frozen features"},
         metrics=metrics,

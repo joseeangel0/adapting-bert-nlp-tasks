@@ -9,6 +9,7 @@ huggingface_hub==0.36.2
 matplotlib==3.11.2
 numpy==2.2.6
 pandas==3.0.6
+pytest==9.1.1
 safetensors==0.8.0
 scikit-learn==1.9.1
 seqeval==1.2.2
