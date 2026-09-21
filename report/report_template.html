@@ -162,19 +162,19 @@ alone.</p>
 <tbody>
 <tr><td><b>H1</b> · Topic</td><td>Feature-based adaptation gets within a few points of fine-tuning.</td>
   <td>Topic is a document-level, largely lexical decision; a pooled sentence vector should already separate
-  <i>Sports</i> from <i>Business</i> without reshaping the encoder.</td><td>{{VERDICT_H1}}</td></tr>
+  <i>Sports</i> from <i>Business</i> without reshaping the encoder.</td><td><span class="pass">Holds</span><br><span class="small">{{VAL_agnews_frozen}} vs {{VAL_agnews_full}}: {{VAL_agnews_gap}} points, for zero updated encoder parameters.</span></td></tr>
 <tr><td><b>H2</b> · NER</td><td>Fine-tuning is required; the frozen gap is large.</td>
   <td>Entity boundaries are a contextual, structured decision, and the BIO scheme means a half-recovered span
-  scores zero. A linear read-out of the last layer has no way to reshape the representation for it.</td><td>{{VERDICT_H2}}</td></tr>
+  scores zero. A linear read-out of the last layer has no way to reshape the representation for it.</td><td><span class="pass">Holds</span><br><span class="small">{{VAL_ner_frozen}} vs {{VAL_ner_full}} entity F1: {{VAL_ner_gap}} points, far outside the seed band.</span></td></tr>
 <tr><td><b>H3</b> · POS</td><td>Frozen features are strong; partial fine-tuning closes most of what is left.</td>
   <td>Probing work consistently finds part-of-speech information in the lower and middle layers of BERT. The
-  pretraining objective essentially has to encode it.</td><td>{{VERDICT_H3}}</td></tr>
+  pretraining objective essentially has to encode it.</td><td><b>Half right</b><br><span class="small">Frozen features are strong as predicted ({{VAL_pos_frozen}}%), but partial fine-tuning closed only half the accuracy gap and almost none of the macro-F1 gap. See 6.3.</span></td></tr>
 <tr><td><b>H4</b> · QA</td><td>Feature-based adaptation fails outright.</td>
   <td>A span head has to make the question interrogate the context. That cross-attention behaviour is not in a
   frozen masked-language-model representation; no linear layer on top can invent it.</td><td>{{VERDICT_H4}}</td></tr>
 <tr><td><b>H5</b> · Pooling</td><td>For frozen sequence classification, mean pooling beats <code>[CLS]</code>.</td>
   <td><code>[CLS]</code> was pretrained for next-sentence prediction, not as a general sentence embedding; without
-  fine-tuning there is nothing that makes it a good summary.</td><td>{{VERDICT_H5}}</td></tr>
+  fine-tuning there is nothing that makes it a good summary.</td><td><span class="pass">Holds</span><br><span class="small">Mean pooling {{VAL_agnews_frozen}} vs {{VAL_agnews_sk_cls}} for <code>[CLS]</code>, same classifier. The pooler result in 6.1 is the same effect, larger.</span></td></tr>
 </tbody></table>
 
 <h2>4. The adaptation ladder, concretely</h2>
@@ -270,7 +270,9 @@ those files, so the prose cannot drift away from the numbers.</p>
 <figure>
   <img src="figures/cost_benefit.png" alt="Primary metric against trainable parameters, log scale">
   <figcaption>Figure 2 — what each rung costs and what it buys. The horizontal axis is trainable parameters on a
-  log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying for.</figcaption>
+  log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying
+  for. The random forest is absent from this figure alone: its capacity is not a weight count, so it has no
+  honest position on a parameter axis. It appears with every other run in figure 1.</figcaption>
 </figure>
 
 <h3>6.1 Topic classification — AG News</h3>
@@ -354,7 +356,51 @@ mean our feature-based rung is a floor for the method rather than its ceiling.</
 buys something that clearly exceeds the noise band, so the top of the ladder is the right answer and the
 rejected alternatives make the case for it.</p>
 
-{{SECTION_POS_QA}}
+<h3>6.3 Part-of-speech tagging — UD English-EWT</h3>
+
+{{TABLE_RUNS_pos}}
+
+<p><b>H3 is half right, and the half that is wrong is the interesting one.</b> The first claim holds
+comfortably: a logistic regression on frozen first-subword states reaches {{VAL_pos_frozen}}% token accuracy.
+Part-of-speech information really is sitting in the pretrained representation, waiting to be read off by a
+linear model — which is what the layer-wise probing literature predicts, and what a masked-language-model
+objective essentially has to encode in order to predict a masked token at all.</p>
+
+<p>The second claim — that partial fine-tuning would close most of the remaining gap — does not survive contact
+with the numbers. Unfreezing the top two layers reaches {{VAL_pos_partial}}%, roughly half of the
+{{VAL_pos_gap}}-point distance to full fine-tuning's {{VAL_pos_full}}%. And on macro-F1 it closes almost
+nothing at all: {{VAL_pos_sk_macro}} → {{VAL_pos_partial_macro}}, against {{VAL_pos_full_macro}} for full
+fine-tuning. Two metrics that agree about the frozen rung disagree sharply about the middle one, which is the
+whole reason for reporting both.</p>
+
+<div class="callout warn">
+<p style="margin:0 0 4pt"><b>Partial fine-tuning made the rarest tag worse than leaving BERT frozen.</b></p>
+<p style="margin:0">On <code>X</code> — 42 test tokens, the residual category for material that fits no other
+tag — F1 goes 19.8 frozen (logistic regression), 8.2 for the frozen probe, <b>4.2 for partial fine-tuning</b>,
+and 45.2 for full fine-tuning. The same run whose headline accuracy improved by 1.7 points gave up almost
+everything it had on the rarest class. With only the top two layers free and a head learning rate of 1e-3, the
+cheapest way to reduce loss is to sharpen the frequent tags; the gradient from 42 tokens cannot compete, and
+the representation that would have distinguished them is frozen below. Full fine-tuning can move the lower
+layers and the embeddings, and it is the only configuration that recovers the class. Accuracy alone would have
+reported this as an unambiguous improvement.</p>
+</div>
+
+<figure>
+  <img src="figures/pos_confusion.png" alt="Row-normalised confusion matrix over the 17 UPOS tags">
+  <figcaption>Figure 5 — the delivered POS model on the UD English-EWT test split, row-normalised. The residual
+  errors are the linguistically hard ones rather than random: 6% of <code>PROPN</code> is read as
+  <code>NOUN</code>, 8% of <code>SYM</code> as <code>PUNCT</code> — both genuinely ambiguous in web text — and
+  <code>X</code> scatters, 31% of it into <code>PROPN</code> and 17% into <code>NOUN</code>, which is what a
+  residual category with 42 test tokens looks like when it is barely learned.</figcaption>
+</figure>
+
+<p><b>Delivered: {{VAL_pos_best_method}}, at {{VAL_pos_best}}% token accuracy</b> and
+{{VAL_pos_full_macro}} macro-F1. This is the one task where we would have been tempted to ship the cheap option
+on the headline metric — {{VAL_pos_frozen}}% for zero updated encoder parameters is a genuinely good tagger —
+and the secondary metric is what argues against it. If the rare tags matter, and in a tagger feeding a parser
+they do, the 110 M-parameter model is worth its cost here.</p>
+
+{{SECTION_QA}}
 
 <h2>7. Training diagnostics</h2>
 

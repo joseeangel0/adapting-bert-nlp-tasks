@@ -193,9 +193,9 @@ def values() -> dict[str, str]:
     # quote a number that belongs to a different experiment.
     by_id = {(r["task"], r["run_id"]): r for r in data}
 
-    def one(task: str, run_id: str) -> str:
+    def one(task: str, run_id: str, which: str = "headline") -> str:
         r = by_id.get((task, run_id))
-        return fmt(r["headline"]) if r and r["headline"] is not None else "—"
+        return fmt(r[which]) if r and r.get(which) is not None else "—"
 
     out["VAL_agnews_probe_linear"] = one("agnews", "frozen_linear_bert-base-uncased")
     out["VAL_agnews_probe_mlp"] = one("agnews", "frozen_mlp_bert-base-uncased")
@@ -206,6 +206,10 @@ def values() -> dict[str, str]:
     ner_mlp = by_id.get(("ner", "frozen_mlp_bert-base-uncased"))
     if ner_sk and ner_mlp and ner_sk["headline"] and ner_mlp["headline"]:
         out["VAL_ner_probe_gain"] = f"{ner_mlp['headline'] - ner_sk['headline']:.1f}"
+
+    out["VAL_pos_sk_macro"] = one("pos", "frozen_sk-logreg_firstsub_bert-base-uncased", "secondary")
+    out["VAL_pos_partial_macro"] = one("pos", "partial_ft2_linear_bert-base-uncased", "secondary")
+    out["VAL_pos_full_macro"] = one("pos", "full_ft_linear_bert-base-uncased", "secondary")
 
     cfg = json.loads((ROOT / "configs" / "report.json").read_text())
     out["TEAM"] = " &middot; ".join(n.replace(" ", "&nbsp;") for n in cfg["team"])

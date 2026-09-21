@@ -1,12 +1,11 @@
 {
   "task": "ner",
-  "run_id": "frozen_sk-logreg_cls_bert-base-uncased",
+  "run_id": "frozen_sk-logreg_firstsub_bert-base-uncased",
   "method": "frozen",
   "model_name": "bert-base-uncased",
   "head": "sklearn:logreg",
   "hyperparams": {
     "estimator": "logreg",
-    "pooling": "cls",
     "params": {
       "C": 1.0,
       "class_weight": null,

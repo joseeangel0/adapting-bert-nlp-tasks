@@ -100,19 +100,21 @@ def fig_ladder(data):
 def fig_cost_benefit(data):
     fig, axes = plt.subplots(1, 4, figsize=(11.2, 3.1))
     for ax, task in zip(axes, TASK_ORDER):
-        rs = [r for r in data if r["task"] == task and r["headline"] is not None]
+        # A random forest's capacity is not a weight count, so it has no honest position on a
+        # parameter axis - plotting it at 1 would make it look like the cheapest model here.
+        rs = [r for r in data
+              if r["task"] == task and r["headline"] is not None and r["trainable"] > 0]
         if not rs:
             ax.axis("off"); continue
         for r in rs:
-            x = max(r["trainable"], 1)
-            ax.plot(x, r["headline"], "o", color=RUNG_COLOR[r["rung"]], markersize=8,
+            ax.plot(r["trainable"], r["headline"], "o", color=RUNG_COLOR[r["rung"]], markersize=8,
                     markeredgecolor=SURFACE, markeredgewidth=1.4, zorder=3)
         # connect the best run of each rung: the shape of the cost/benefit curve
         best = {}
         for r in rs:
             if r["rung"] not in best or r["headline"] > best[r["rung"]]["headline"]:
                 best[r["rung"]] = r
-        pts = sorted(((max(b["trainable"], 1), b["headline"]) for b in best.values()))
+        pts = sorted(((b["trainable"], b["headline"]) for b in best.values()))
         if len(pts) > 1:
             ax.plot(*zip(*pts), color=MUTED, linewidth=1.2, alpha=0.55, zorder=2)
         ax.set_xscale("log")
