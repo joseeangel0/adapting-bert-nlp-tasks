@@ -95,6 +95,36 @@ class QATrainer(TwoGroupTrainer):
 
 # --------------------------------------------------------------------------- #
 
+def _accepted_training_args() -> set[str]:
+    """Names this installed transformers actually accepts on TrainingArguments."""
+    import dataclasses
+    import inspect
+
+    try:
+        return {f.name for f in dataclasses.fields(TrainingArguments)}
+    except TypeError:                                   # not a dataclass on this version
+        return set(inspect.signature(TrainingArguments.__init__).parameters) - {"self"}
+
+
+def build_training_args(desired: dict[str, Any]) -> tuple[TrainingArguments, list[str]]:
+    """TrainingArguments has churned across major versions - `overwrite_output_dir` and
+    `warmup_ratio` are gone in transformers 5, and a replica of this work is unlikely to
+    have our exact pin. Rather than crash, keep the arguments this version accepts and
+    return the ones it does not, so the difference is recorded with the run instead of
+    silently changing what was trained.
+    """
+    accepted = _accepted_training_args()
+    kept = {k: v for k, v in desired.items() if k in accepted}
+    dropped = sorted(set(desired) - accepted)
+    if dropped:
+        import transformers
+        print(f"[warning] transformers {transformers.__version__} does not accept "
+              f"{dropped}; those settings are NOT applied to this run and are recorded "
+              f"in its results file. Pin transformers==4.57.6 to reproduce the reported "
+              f"numbers exactly.", flush=True)
+    return TrainingArguments(**kept), dropped
+
+
 def _attn_kwargs() -> dict[str, str]:
     """MPS has no fused attention kernel with dropout, so ask for the eager one there."""
     return {"attn_implementation": "eager"} if get_device().type == "mps" else {}
@@ -216,7 +246,7 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
     # `overwrite_output_dir` was removed in transformers 5 and is unnecessary here anyway:
     # save_strategy is "no" and nothing is ever resumed from the output directory. Leaving it
     # in made the grid crash on any machine with a newer transformers than the pinned one.
-    args = TrainingArguments(
+    args, dropped_args = build_training_args(dict(
         output_dir=str(out_dir),
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size, per_device_eval_batch_size=eval_batch_size,
@@ -227,7 +257,7 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
         data_seed=seed, **precision_flags(), dataloader_num_workers=0,
         disable_tqdm=False, label_names=(["start_positions", "end_positions"]
                                          if td.kind == "qa" else None),
-    )
+    ))
 
     timer = EpochTimer()
     TrainerCls = QATrainer if td.kind == "qa" else TwoGroupTrainer
@@ -277,7 +307,10 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
                      "effective_batch_size": batch_size * grad_accum, "head_lr": head_lr,
                      "body_lr": body_lr if method != "frozen" else None,
                      "weight_decay": weight_decay, "warmup_ratio": warmup_ratio,
-                     "max_length": MAX_LEN[task], "bf16": args.bf16, "fp16": args.fp16,
+                     "max_length": MAX_LEN[task],
+                     "bf16": getattr(args, "bf16", None), "fp16": getattr(args, "fp16", None),
+                     "transformers": __import__("transformers").__version__,
+                     "unsupported_args": dropped_args,
                      "scheduler": "linear with 10% warmup"},
         params=params, metrics=metrics,
         train_log=[d for d in trainer.state.log_history],
