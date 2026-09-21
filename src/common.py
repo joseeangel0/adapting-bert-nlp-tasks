@@ -83,12 +83,19 @@ def _layers(body: torch.nn.Module):
     raise AttributeError("no encoder layers found on body")
 
 
-def apply_adaptation(model: torch.nn.Module, method: str) -> dict[str, Any]:
+def apply_adaptation(model: torch.nn.Module, method: str,
+                     pooler_as_head: bool = False) -> dict[str, Any]:
     """Freeze/unfreeze according to a rung of the ladder.
 
     ``frozen``          - body entirely frozen, only the head trains (feature-based).
     ``partial_ftN``     - head + top N encoder layers.
     ``full_ft``         - everything.
+
+    ``pooler_as_head`` only matters for sequence classification. BertForSequenceClassification
+    does not classify the raw [CLS] state: it classifies ``tanh(dense([CLS]))``, BERT's pooler,
+    which was pretrained for next-sentence prediction. Freezing it makes a "linear probe" read
+    a tanh-saturated NSP vector instead of the sentence representation - so this flag lets the
+    pooler count as head (still zero encoder parameters updated). Both variants are measured.
     """
     body = _encoder(model)
     layers = _layers(body)
@@ -108,26 +115,43 @@ def apply_adaptation(model: torch.nn.Module, method: str) -> dict[str, Any]:
                     p.requires_grad = True
         elif method == "frozen":
             top_n = 0
+            if pooler_as_head and getattr(body, "pooler", None) is not None:
+                for p in body.pooler.parameters():
+                    p.requires_grad = True
         else:
             raise ValueError(f"unknown adaptation method: {method}")
         # The head always trains; everything outside the body is head.
-        body_ids = {id(p) for p in body.parameters()}
+        head_of_body = (body.pooler.parameters() if pooler_as_head and method == "frozen"
+                        and getattr(body, "pooler", None) is not None else ())
+        body_ids = {id(p) for p in body.parameters()} - {id(p) for p in head_of_body}
         for p in model.parameters():
             if id(p) not in body_ids:
                 p.requires_grad = True
 
     if method == "frozen":
-        # A feature extractor must be deterministic: pin the body in eval mode so its
+        # A feature extractor must be deterministic: pin the encoder in eval mode so its
         # dropout never fires, and keep Trainer's model.train() from switching it back.
-        body.eval()
-        body.train = lambda mode=True, _b=body: _b
+        # The pooler, when it counts as head, keeps its normal train/eval behaviour.
+        frozen_part = body.encoder if pooler_as_head and hasattr(body, "encoder") else body
+        frozen_part.eval()
+        frozen_part.train = lambda mode=True, _b=frozen_part: _b
 
-    return {"method": method, "encoder_layers": n_layers, "unfrozen_top_layers": top_n}
+    return {"method": method, "encoder_layers": n_layers, "unfrozen_top_layers": top_n,
+            "pooler_as_head": bool(pooler_as_head)}
 
 
 def param_groups(model: torch.nn.Module, head_lr: float, body_lr: float) -> list[dict]:
-    """Two parameter groups: a fresh head takes big steps, pretrained weights take small ones."""
-    body_ids = {id(p) for p in _encoder(model).parameters()}
+    """Two parameter groups: a fresh head takes big steps, pretrained weights take small ones.
+
+    A trainable parameter inside the body goes in the body group *unless* it is the pooler
+    being used as head, which is re-initialised in spirit and takes the head rate.
+    """
+    body = _encoder(model)
+    body_ids = {id(p) for p in body.parameters()}
+    pooler = getattr(body, "pooler", None)
+    if pooler is not None and all(p.requires_grad for p in pooler.parameters()) \
+            and not any(p.requires_grad for p in _layers(body).parameters()):
+        body_ids -= {id(p) for p in pooler.parameters()}
     head, body = [], []
     for p in model.parameters():
         if not p.requires_grad:

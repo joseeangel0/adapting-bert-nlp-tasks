@@ -45,6 +45,8 @@ def method_label(rec: dict) -> str:
                     "mlp": "MLP probe"}.get(head, head)
         pooling = rec.get("hyperparams", {}).get("pooling")
         suffix = f", {pooling}-pooled" if pooling and pooling != "cls" else ""
+        if rec.get("params", {}).get("pooler_as_head"):
+            suffix += ", pooler as head"
         return f"Feature-based ({consumer}{suffix})"
     if m.startswith("partial_ft"):
         return f"Partial FT (top {m.replace('partial_ft', '')} layers)"

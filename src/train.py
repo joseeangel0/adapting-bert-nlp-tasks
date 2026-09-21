@@ -8,11 +8,12 @@ crawls for the head or destroys what pretraining built.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
-from transformers import (AutoModelForQuestionAnswering,
+from transformers import (AutoConfig, AutoModelForQuestionAnswering,
                           AutoModelForSequenceClassification,
                           AutoModelForTokenClassification, AutoTokenizer,
                           DataCollatorForTokenClassification,
@@ -34,7 +35,8 @@ class MLPHeadWrapper(torch.nn.Module):
     representation buys anything over a linear one.
     """
 
-    def __init__(self, in_features: int, num_labels: int, hidden: int = 512, dropout: float = 0.1):
+    def __init__(self, in_features: int, num_labels: int, hidden: int = 512,
+                 dropout: float = 0.1):
         super().__init__()
         self.net = torch.nn.Sequential(
             torch.nn.Linear(in_features, hidden), torch.nn.GELU(),
@@ -97,6 +99,32 @@ def _attn_kwargs() -> dict[str, str]:
     return {"attn_implementation": "eager"} if get_device().type == "mps" else {}
 
 
+HEAD_CLASSES = {"sequence": AutoModelForSequenceClassification,
+                "token": AutoModelForTokenClassification,
+                "qa": AutoModelForQuestionAnswering}
+MLP_HIDDEN = 512
+
+
+def load_run_model(kind: str, path: str):
+    """Reload a checkpoint this project saved, MLP probes included.
+
+    ``from_pretrained`` rebuilds ``classifier`` as a plain Linear, which silently discards an
+    MLP head's weights - a reloaded model would carry a randomly initialised head and score
+    like chance. The head type is recorded in the config at build time, so it can be rebuilt
+    here before its weights are restored.
+    """
+    cfg = AutoConfig.from_pretrained(path)
+    model = HEAD_CLASSES[kind].from_pretrained(path, **_attn_kwargs())
+    if getattr(cfg, "u2t01_head", "linear") == "mlp":
+        from safetensors.torch import load_file
+        model.classifier = MLPHeadWrapper(cfg.hidden_size, cfg.num_labels,
+                                          hidden=getattr(cfg, "u2t01_head_hidden", MLP_HIDDEN))
+        state = load_file(str(Path(path) / "model.safetensors"))
+        model.classifier.load_state_dict(
+            {k[len("classifier."):]: v for k, v in state.items() if k.startswith("classifier.")})
+    return model
+
+
 def build_model(td: TaskData, model_name: str, head: str = "linear"):
     attn = _attn_kwargs()
     if td.kind == "sequence":
@@ -105,18 +133,22 @@ def build_model(td: TaskData, model_name: str, head: str = "linear"):
             id2label={i: l for i, l in enumerate(td.labels)},
             label2id={l: i for i, l in enumerate(td.labels)}, **attn)
         if head == "mlp":
-            model.classifier = MLPHeadWrapper(model.config.hidden_size, td.num_labels)
+            model.classifier = MLPHeadWrapper(model.config.hidden_size, td.num_labels, MLP_HIDDEN)
     elif td.kind == "token":
         model = AutoModelForTokenClassification.from_pretrained(
             model_name, num_labels=td.num_labels,
             id2label={i: l for i, l in enumerate(td.labels)},
             label2id={l: i for i, l in enumerate(td.labels)}, **attn)
         if head == "mlp":
-            model.classifier = MLPHeadWrapper(model.config.hidden_size, td.num_labels)
+            model.classifier = MLPHeadWrapper(model.config.hidden_size, td.num_labels, MLP_HIDDEN)
     elif td.kind == "qa":
         model = AutoModelForQuestionAnswering.from_pretrained(model_name, **attn)
     else:
         raise ValueError(td.kind)
+    # Recorded so load_run_model can rebuild a non-standard head before restoring its weights.
+    model.config.u2t01_head = head
+    if head == "mlp":
+        model.config.u2t01_head_hidden = MLP_HIDDEN
     return model
 
 
@@ -139,7 +171,8 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
         head_lr: float = 1e-3, body_lr: float = 2e-5, weight_decay: float = 0.01,
         warmup_ratio: float = 0.1, seed: int = 42, run_id: str | None = None,
         save_model: bool = False, eval_batch_size: int | None = None,
-        limit: int | None = None, notes: str = "") -> RunRecord:
+        limit: int | None = None, pooler_as_head: bool = False,
+        notes: str = "") -> RunRecord:
     set_seed(seed)
     device = get_device()
     td = load_task(task)
@@ -151,7 +184,7 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
     eval_batch_size = eval_batch_size or batch_size * 2
 
     model = build_model(td, model_name, head)
-    ladder = apply_adaptation(model, method)
+    ladder = apply_adaptation(model, method, pooler_as_head=pooler_as_head)
     params = count_params(model) | ladder | {"head_params": head_param_count(model)}
 
     if td.kind == "qa":
