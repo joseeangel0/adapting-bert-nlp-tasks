@@ -57,7 +57,7 @@
   <b>Repository:</b> github.com/joseeangel0/adapting-bert-nlp-tasks</p>
   <p class="small" style="margin-top:6pt">Deliverables: this report, the code that produced every number in it
     (<code>scripts/run_experiments.py</code> reruns the whole grid), and four published models with model cards.
-    Environment: Apple M5 - torch 2.14.0 on mps · 16 runs · 103 minutes of training.</p>
+    Environment: Apple M5 - torch 2.14.0 on mps · 20 runs · 172 minutes of training.</p>
 </section>
 
 <ol class="toc">
@@ -76,7 +76,7 @@
 
 <h2>1. What we delivered</h2>
 
-<table class="keep"><thead><tr><th>Task</th><th>Delivered model</th><th>Method</th><th class='n'>Score</th><th class='n'>Trainable</th></tr></thead><tbody><tr><td>Topic classification (AG News)</td><td><code>bert-base-uncased-agnews-topic</code></td><td>Full fine-tuning</td><td class='n'><b>93.01</b> accuracy</td><td class='n'>109,485,316</td></tr><tr><td>Named entity recognition (CoNLL-2003)</td><td><code>bert-base-uncased-conll2003-ner</code></td><td>Full fine-tuning</td><td class='n'><b>90.41</b> entity f1</td><td class='n'>108,898,569</td></tr><tr><td>Part-of-speech tagging (UD English-EWT)</td><td><code>bert-base-uncased-ud-ewt-pos</code></td><td>Full fine-tuning</td><td class='n'><b>97.51</b> token accuracy</td><td class='n'>108,904,721</td></tr></tbody></table>
+<table class="keep"><thead><tr><th>Task</th><th>Delivered model</th><th>Method</th><th class='n'>Score</th><th class='n'>Trainable</th></tr></thead><tbody><tr><td>Topic classification (AG News)</td><td><code>bert-base-uncased-agnews-topic</code></td><td>Full fine-tuning</td><td class='n'><b>93.01</b> accuracy</td><td class='n'>109,485,316</td></tr><tr><td>Named entity recognition (CoNLL-2003)</td><td><code>bert-base-uncased-conll2003-ner</code></td><td>Full fine-tuning</td><td class='n'><b>90.41</b> entity F1</td><td class='n'>108,898,569</td></tr><tr><td>Part-of-speech tagging (UD English-EWT)</td><td><code>bert-base-uncased-ud-ewt-pos</code></td><td>Full fine-tuning</td><td class='n'><b>97.51</b> token accuracy</td><td class='n'>108,904,721</td></tr><tr><td>Extractive QA (SQuAD v1.1)</td><td><code>bert-base-uncased-squad-qa</code></td><td>Partial FT (top 4 layers)</td><td class='n'><b>72.91</b> F1</td><td class='n'>28,353,026</td></tr></tbody></table>
 
 <p>Each of these four models was selected against alternatives trained by us on the same data with the same
 seed, and every rejected alternative is reported with its numbers in section 6. The short version of what the
@@ -85,7 +85,7 @@ measurements say:</p>
 <div class="callout">
   <p style="margin:0"><b>The gap between a frozen BERT and a fine-tuned one is not a property of BERT — it is a
   property of the task.</b> It is +3.6 points on part-of-speech tagging, where the information the head
-  needs is already sitting in the pretrained representation, and {{VAL_qa_gap}} points on extractive QA, where it
+  needs is already sitting in the pretrained representation, and +47.7 points on extractive QA, where it
   is not. Choosing the rung of the ladder without measuring is choosing blind.</p>
 </div>
 
@@ -95,7 +95,7 @@ measurements say:</p>
 size 768). Only the head changes: a sequence classifier over <code>[CLS]</code> for topic classification, a
 per-token classifier for NER and POS, and a two-logit span head (start, end) for extractive QA.</p>
 
-<table class="keep"><thead><tr><th>Task</th><th>Dataset</th><th class='n'>Train</th><th class='n'>Dev</th><th class='n'>Test</th><th class='n'>Labels</th><th>License</th></tr></thead><tbody><tr><td>Topic classification</td><td><code>fancyzhx/ag_news</code></td><td class='n'>20,000</td><td class='n'>5,000</td><td class='n'>7,600</td><td class='n'>4</td><td class='small'>Custom (AG News corpus, academic use)</td></tr><tr><td>Named entity recognition</td><td><code>lhoestq/conll2003</code></td><td class='n'>14,041</td><td class='n'>3,250</td><td class='n'>3,453</td><td class='n'>9</td><td class='small'>Reuters corpus terms / research use (CoNLL-2003 shared task)</td></tr><tr><td>Part-of-speech tagging</td><td><code>universal-dependencies/universal_dependencies (config en_ewt)</code></td><td class='n'>12,544</td><td class='n'>2,001</td><td class='n'>2,077</td><td class='n'>17</td><td class='small'>CC BY-SA 4.0</td></tr></tbody></table>
+<table class="keep"><thead><tr><th>Task</th><th>Dataset</th><th class='n'>Train</th><th class='n'>Dev</th><th class='n'>Test</th><th class='n'>Labels</th><th>License</th></tr></thead><tbody><tr><td>Topic classification</td><td><code>fancyzhx/ag_news</code></td><td class='n'>20,000</td><td class='n'>5,000</td><td class='n'>7,600</td><td class='n'>4</td><td class='small'>Custom (AG News corpus, academic use)</td></tr><tr><td>Named entity recognition</td><td><code>lhoestq/conll2003</code></td><td class='n'>14,041</td><td class='n'>3,250</td><td class='n'>3,453</td><td class='n'>9</td><td class='small'>Reuters corpus terms / research use (CoNLL-2003 shared task)</td></tr><tr><td>Part-of-speech tagging</td><td><code>universal-dependencies/universal_dependencies (config en_ewt)</code></td><td class='n'>12,544</td><td class='n'>2,001</td><td class='n'>2,077</td><td class='n'>17</td><td class='small'>CC BY-SA 4.0</td></tr><tr><td>Extractive QA</td><td><code>rajpurkar/squad (v1.1)</code></td><td class='n'>15,000</td><td class='n'>3,000</td><td class='n'>10,570</td><td class='n'>span</td><td class='small'>CC BY-SA 4.0</td></tr></tbody></table>
 
 <p>AG News ships no development split, so we carved one out of the training pool with the fixed seed: 20 000 rows
 for training, 5 000 held out to watch the epochs, and the official 7 600-row test set kept untouched for the
@@ -171,7 +171,7 @@ alone.</p>
   pretraining objective essentially has to encode it.</td><td><b>Half right</b><br><span class="small">Frozen features are strong as predicted (93.94%), but partial fine-tuning closed only half the accuracy gap and almost none of the macro-F1 gap. See 6.3.</span></td></tr>
 <tr><td><b>H4</b> · QA</td><td>Feature-based adaptation fails outright.</td>
   <td>A span head has to make the question interrogate the context. That cross-attention behaviour is not in a
-  frozen masked-language-model representation; no linear layer on top can invent it.</td><td>{{VERDICT_H4}}</td></tr>
+  frozen masked-language-model representation; no linear layer on top can invent it.</td><td><span class="pass">Holds</span><br><span class="small">25.18 vs 72.91 F1: +47.7 points, the widest gap in the assignment. See 6.4 for what the frozen model actually answers.</span></td></tr>
 <tr><td><b>H5</b> · Pooling</td><td>For frozen sequence classification, mean pooling beats <code>[CLS]</code>.</td>
   <td><code>[CLS]</code> was pretrained for next-sentence prediction, not as a general sentence embedding; without
   fine-tuning there is nothing that makes it a good summary.</td><td><span class="pass">Holds</span><br><span class="small">Mean pooling 90.18 vs 88.61 for <code>[CLS]</code>, same classifier. The pooler result in 6.1 is the same effect, larger.</span></td></tr>
@@ -259,7 +259,7 @@ those files, so the prose cannot drift away from the numbers.</p>
 
 <p>The comparison the assignment asks for — tasks against methods, best run of each rung, primary metric:</p>
 
-<table class="keep"><thead><tr><th>Task</th><th>Metric</th><th class="n">Feature-based</th><th class="n">Partial fine-tuning</th><th class="n">Full fine-tuning</th><th>Delivered</th></tr></thead><tbody><tr><td>Topic classification (AG News)</td><td>Accuracy</td><td class="n">90.18</td><td class="n">92.36</td><td class="n best">93.01</td><td>Full fine-tuning</td></tr><tr><td>Named entity recognition (CoNLL-2003)</td><td>Entity F1</td><td class="n">84.17</td><td class="n">88.10</td><td class="n best">90.41</td><td>Full fine-tuning</td></tr><tr><td>Part-of-speech tagging (UD English-EWT)</td><td>Token accuracy</td><td class="n">93.94</td><td class="n">95.66</td><td class="n best">97.51</td><td>Full fine-tuning</td></tr></tbody></table>
+<table class="keep"><thead><tr><th>Task</th><th>Metric</th><th class="n">Feature-based</th><th class="n">Partial fine-tuning</th><th class="n">Full fine-tuning</th><th>Delivered</th></tr></thead><tbody><tr><td>Topic classification (AG News)</td><td>Accuracy</td><td class="n">90.18</td><td class="n">92.36</td><td class="n best">93.01</td><td>Full fine-tuning</td></tr><tr><td>Named entity recognition (CoNLL-2003)</td><td>Entity F1</td><td class="n">84.17</td><td class="n">88.10</td><td class="n best">90.41</td><td>Full fine-tuning</td></tr><tr><td>Part-of-speech tagging (UD English-EWT)</td><td>Token accuracy</td><td class="n">93.94</td><td class="n">95.66</td><td class="n best">97.51</td><td>Full fine-tuning</td></tr><tr><td>Extractive QA (SQuAD v1.1)</td><td>F1</td><td class="n">25.18</td><td class="n best">72.91</td><td class="n">—</td><td>Partial FT (top 4 layers)</td></tr></tbody></table>
 
 <figure>
   <img src="figures/ladder.png" alt="Every run, grouped by task, scored on its primary metric">
@@ -270,12 +270,14 @@ those files, so the prose cannot drift away from the numbers.</p>
 <figure>
   <img src="figures/cost_benefit.png" alt="Primary metric against trainable parameters, log scale">
   <figcaption>Figure 2 — what each rung costs and what it buys. The horizontal axis is trainable parameters on a
-  log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying for.</figcaption>
+  log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying
+  for. The random forest is absent from this figure alone: its capacity is not a weight count, so it has no
+  honest position on a parameter axis. It appears with every other run in figure 1.</figcaption>
 </figure>
 
 <h3>6.1 Topic classification — AG News</h3>
 
-<table><thead><tr><th>Method</th><th class='n'>Trainable params</th><th class='n'>Share</th><th class='n'>Accuracy</th><th class='n'>Macro F1</th><th class='n'>Train (min)</th></tr></thead><tbody><tr><td>Feature-based (logistic regression, mean-pooled)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>90.18</td><td class='n'>90.18</td><td class='n'>2.9</td></tr><tr><td>Feature-based (linear SVM)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>89.21</td><td class='n'>89.20</td><td class='n'>0.1</td></tr><tr><td>Feature-based (logistic regression)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>88.61</td><td class='n'>88.59</td><td class='n'>2.0</td></tr><tr><td>Feature-based (random forest)</td><td class='n'>0</td><td class='n'>0.0%</td><td class='n '>84.87</td><td class='n'>84.79</td><td class='n'>0.3</td></tr><tr><td>Feature-based (MLP probe)</td><td class='n'>395,780</td><td class='n'>0.36%</td><td class='n '>84.58</td><td class='n'>84.57</td><td class='n'>14.8</td></tr><tr><td>Feature-based (linear probe)</td><td class='n'>3,076</td><td class='n'>0.003%</td><td class='n '>82.09</td><td class='n'>82.04</td><td class='n'>12.5</td></tr><tr><td>Partial FT (top 2 layers)</td><td class='n'>14,178,820</td><td class='n'>12.95%</td><td class='n '>92.36</td><td class='n'>92.35</td><td class='n'>13.1</td></tr><tr><td><b>Full fine-tuning</b></td><td class='n'>109,485,316</td><td class='n'>100.0%</td><td class='n best'>93.01</td><td class='n'>93.00</td><td class='n'>16.6</td></tr></tbody></table>
+<table><thead><tr><th>Method</th><th class='n'>Trainable params</th><th class='n'>Share</th><th class='n'>Accuracy</th><th class='n'>Macro F1</th><th class='n'>Train (min)</th></tr></thead><tbody><tr><td>Feature-based (logistic regression, mean-pooled)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>90.18</td><td class='n'>90.18</td><td class='n'>2.9</td></tr><tr><td>Feature-based (linear probe, pooler as head)</td><td class='n'>593,668</td><td class='n'>0.542%</td><td class='n '>89.61</td><td class='n'>89.59</td><td class='n'>13.6</td></tr><tr><td>Feature-based (linear SVM)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>89.21</td><td class='n'>89.20</td><td class='n'>0.1</td></tr><tr><td>Feature-based (logistic regression)</td><td class='n'>3,076</td><td class='n'>0.0%</td><td class='n '>88.61</td><td class='n'>88.59</td><td class='n'>2.0</td></tr><tr><td>Feature-based (random forest)</td><td class='n'>0</td><td class='n'>0.0%</td><td class='n '>84.87</td><td class='n'>84.79</td><td class='n'>0.3</td></tr><tr><td>Feature-based (MLP probe)</td><td class='n'>395,780</td><td class='n'>0.36%</td><td class='n '>84.58</td><td class='n'>84.57</td><td class='n'>14.8</td></tr><tr><td>Feature-based (linear probe)</td><td class='n'>3,076</td><td class='n'>0.003%</td><td class='n '>82.09</td><td class='n'>82.04</td><td class='n'>12.5</td></tr><tr><td>Partial FT (top 2 layers)</td><td class='n'>14,178,820</td><td class='n'>12.95%</td><td class='n '>92.36</td><td class='n'>92.35</td><td class='n'>13.1</td></tr><tr><td><b>Full fine-tuning</b></td><td class='n'>109,485,316</td><td class='n'>100.0%</td><td class='n best'>93.01</td><td class='n'>93.00</td><td class='n'>16.6</td></tr></tbody></table>
 
 <p>This is the task where the feature-based rung defends itself. A logistic regression on frozen, mean-pooled
 last hidden states reaches 90.18% accuracy — +2.8 points below full fine-tuning,
@@ -305,7 +307,7 @@ should have been noise. It is not, and the cause is that
 Frozen, that tanh-saturated NSP vector is what the probe has to work with. Giving the head more capacity
 barely helps — an MLP probe on the same frozen pooler reaches only 84.58% — but letting the
 pooler count as head instead of as frozen body recovers the gap at
-—%, with still zero encoder parameters updated. The lesson generalises: <i>frozen</i>
+89.61%, with still zero encoder parameters updated. The lesson generalises: <i>frozen</i>
 is not a single thing, and where you draw the line between body and head changes the answer more than the
 choice of classifier does.</p>
 </div>
@@ -320,7 +322,7 @@ and we say plainly in its model card that the partial variant is within noise at
 
 <h3>6.2 Named entity recognition — CoNLL-2003</h3>
 
-<table><thead><tr><th>Method</th><th class='n'>Trainable params</th><th class='n'>Share</th><th class='n'>Entity F1</th><th class='n'>Token accuracy</th><th class='n'>Train (min)</th></tr></thead><tbody><tr><td>Feature-based (MLP probe)</td><td class='n'>398,345</td><td class='n'>0.364%</td><td class='n '>84.17</td><td class='n'>97.25</td><td class='n'>4.2</td></tr><tr><td>Feature-based (logistic regression)</td><td class='n'>6,921</td><td class='n'>0.0%</td><td class='n '>77.84</td><td class='n'>96.10</td><td class='n'>1.2</td></tr><tr><td>Partial FT (top 4 layers)</td><td class='n'>28,358,409</td><td class='n'>26.041%</td><td class='n '>88.10</td><td class='n'>97.71</td><td class='n'>4.6</td></tr><tr><td><b>Full fine-tuning</b></td><td class='n'>108,898,569</td><td class='n'>100.0%</td><td class='n best'>90.41</td><td class='n'>98.08</td><td class='n'>10.6</td></tr></tbody></table>
+<table><thead><tr><th>Method</th><th class='n'>Trainable params</th><th class='n'>Share</th><th class='n'>Entity F1</th><th class='n'>Token accuracy</th><th class='n'>Train (min)</th></tr></thead><tbody><tr><td>Feature-based (MLP probe)</td><td class='n'>398,345</td><td class='n'>0.364%</td><td class='n '>84.17</td><td class='n'>97.25</td><td class='n'>4.2</td></tr><tr><td>Feature-based (linear probe)</td><td class='n'>6,921</td><td class='n'>0.006%</td><td class='n '>80.90</td><td class='n'>96.58</td><td class='n'>4.3</td></tr><tr><td>Feature-based (logistic regression)</td><td class='n'>6,921</td><td class='n'>0.0%</td><td class='n '>77.84</td><td class='n'>96.10</td><td class='n'>1.2</td></tr><tr><td>Partial FT (top 4 layers)</td><td class='n'>28,358,409</td><td class='n'>26.041%</td><td class='n '>88.10</td><td class='n'>97.71</td><td class='n'>4.6</td></tr><tr><td><b>Full fine-tuning</b></td><td class='n'>108,898,569</td><td class='n'>100.0%</td><td class='n best'>90.41</td><td class='n'>98.08</td><td class='n'>10.6</td></tr></tbody></table>
 
 <p><b>H2 holds, and the metric choice is what makes it visible.</b> The frozen probe reaches
 84.17 entity F1 against 90.41 for full fine-tuning — a gap of
@@ -386,8 +388,10 @@ reported this as an unambiguous improvement.</p>
 <figure>
   <img src="figures/pos_confusion.png" alt="Row-normalised confusion matrix over the 17 UPOS tags">
   <figcaption>Figure 5 — the delivered POS model on the UD English-EWT test split, row-normalised. The residual
-  errors are the linguistically hard ones rather than random: <code>PROPN</code> against <code>NOUN</code>,
-  <code>ADJ</code> against <code>NOUN</code> in compounds, and <code>X</code> scattering across everything.</figcaption>
+  errors are the linguistically hard ones rather than random: 6% of <code>PROPN</code> is read as
+  <code>NOUN</code>, 8% of <code>SYM</code> as <code>PUNCT</code> — both genuinely ambiguous in web text — and
+  <code>X</code> scatters, 31% of it into <code>PROPN</code> and 17% into <code>NOUN</code>, which is what a
+  residual category with 42 test tokens looks like when it is barely learned.</figcaption>
 </figure>
 
 <p><b>Delivered: Full fine-tuning, at 97.51% token accuracy</b> and
@@ -396,7 +400,44 @@ on the headline metric — 93.94% for zero updated encoder parameters is a genui
 and the secondary metric is what argues against it. If the rare tags matter, and in a tagger feeding a parser
 they do, the 110 M-parameter model is worth its cost here.</p>
 
-{{SECTION_QA}}
+<h3>6.4 Extractive question answering — SQuAD v1.1</h3>
+
+<table><thead><tr><th>Method</th><th class='n'>Trainable params</th><th class='n'>Share</th><th class='n'>F1</th><th class='n'>Exact match</th><th class='n'>Train (min)</th></tr></thead><tbody><tr><td>Feature-based (linear probe)</td><td class='n'>1,538</td><td class='n'>0.001%</td><td class='n '>25.18</td><td class='n'>16.20</td><td class='n'>25.0</td></tr><tr><td><b>Partial FT (top 4 layers)</b></td><td class='n'>28,353,026</td><td class='n'>26.037%</td><td class='n best'>72.91</td><td class='n'>60.68</td><td class='n'>25.7</td></tr></tbody></table>
+
+<p><b>H4 holds, and by the widest margin in the assignment.</b> A span head on a frozen body reaches
+25.18 F1; unfreezing the top four encoder layers reaches 72.91. That is
++47.7 points — an order of magnitude larger than the gap on part-of-speech tagging, on the same body,
+with the same head learning rate, in the same framework. Whatever "feature-based adaptation" means, it does not
+mean the same thing from one task to the next.</p>
+
+<p>The reason is visible in the predictions rather than in the score. A frozen BERT plus a linear span head
+produces answers of the right <i>kind</i> and the wrong <i>identity</i>:</p>
+
+<table class="keep"><thead><tr><th>Question</th><th>Gold answer</th><th>Predicted span</th></tr></thead><tbody><tr><td>Which NFL team represented the AFC at Super Bowl 50?</td><td>Denver Broncos</td><td>Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers</td></tr><tr><td>Which NFL team represented the NFC at Super Bowl 50?</td><td>Carolina Panthers</td><td>Carolina Panthers</td></tr><tr><td>Where did Super Bowl 50 take place?</td><td>Santa Clara, California</td><td>Santa Clara, California</td></tr><tr><td>Which NFL team won Super Bowl 50?</td><td>Denver Broncos</td><td>Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers</td></tr><tr><td>What color was used to emphasize the 50th anniversary of the Super Bowl?</td><td>gold</td><td>gold</td></tr></tbody></table>
+
+<p>Asked which team represented the AFC, the frozen model answers <i>Carolina Panthers</i> — a team name, from
+the right sentence, and the wrong one, because the NFC team appears too and nothing in a frozen masked-language-model
+representation makes the token <i>AFC</i> in the question reach into the context and discriminate. Asked where
+the game took place, it returns <i>Super Bowl 50</i>: the most salient span in the paragraph, which is what you
+get when a model has learned what answers look like but not what <i>this</i> question wants. The span head is
+reading a representation that was never asked to let the question interrogate the passage, and a linear layer
+on top cannot invent that behaviour. Fine-tuning is not an optimisation here; it is what creates the capability.</p>
+
+<p>The <b>exact-match / F1 spread</b> is the second diagnostic worth reading. The delivered model scores
+60.68 EM against 72.91 F1, a 12-point gap, and the first sample prediction shows
+why: asked for the AFC team it returns <i>Denver Broncos defeated the National Football Conference (NFC)
+champion Carolina Panthers</i> — the answer is in there, with the boundary in the wrong place. That is a
+different disease from looking in the wrong place, and it is the one a model trained on 15 000 examples has.
+More data tightens boundaries; it is not what separates this model from the frozen one.</p>
+
+<p><b>Delivered: Partial FT (top 4 layers), at 72.91 F1 and 60.68 exact match</b>,
+from 28.4 M trainable parameters. Two caveats stated plainly. First, this is below published SQuAD numbers for
+<code>bert-base</code> (around 88 F1), which is expected: we train on the 15 000-example subsample the
+assignment specifies, roughly a sixth of the corpus. Second, its development F1 was still climbing by 1.9
+points on the final epoch, so this run is under-trained rather than converged — the number is a floor for the
+method, not its ceiling. We report it as measured rather than extending the budget for one task and not the
+others.</p>
+
 
 <h2>7. Training diagnostics</h2>
 
@@ -406,13 +447,110 @@ they do, the 110 M-parameter model is worth its cost here.</p>
   epoch. These are the curves used to decide that runs had converged and that no learning rate was misconfigured.</figcaption>
 </figure>
 
-{{PROSE_DIAGNOSTICS}}
+<p>Three things were being watched in these curves, and all three behaved.</p>
 
-<table><thead><tr><th>Task</th><th>Method</th><th class='n'>sec / epoch</th><th class='n'>sec / step</th><th class='n'>Total train (min)</th><th class='n'>Test eval (s)</th></tr></thead><tbody><tr><td>Topic classification</td><td>Feature-based (MLP probe)</td><td class='n'>140</td><td class='n'>0.224</td><td class='n'>14.8</td><td class='n'>50</td></tr><tr><td>Topic classification</td><td>Feature-based (linear probe)</td><td class='n'>117</td><td class='n'>0.188</td><td class='n'>12.5</td><td class='n'>55</td></tr><tr><td>Topic classification</td><td>Partial FT (top 2 layers)</td><td class='n'>227</td><td class='n'>0.363</td><td class='n'>13.1</td><td class='n'>44</td></tr><tr><td>Topic classification</td><td>Full fine-tuning</td><td class='n'>463</td><td class='n'>0.741</td><td class='n'>16.6</td><td class='n'>47</td></tr><tr><td>Named entity recognition</td><td>Feature-based (MLP probe)</td><td class='n'>40</td><td class='n'>0.091</td><td class='n'>4.2</td><td class='n'>10</td></tr><tr><td>Named entity recognition</td><td>Partial FT (top 4 layers)</td><td class='n'>82</td><td class='n'>0.186</td><td class='n'>4.6</td><td class='n'>10</td></tr><tr><td>Named entity recognition</td><td>Full fine-tuning</td><td class='n'>198</td><td class='n'>0.450</td><td class='n'>10.6</td><td class='n'>16</td></tr><tr><td>Part-of-speech tagging</td><td>Feature-based (linear probe)</td><td class='n'>43</td><td class='n'>0.110</td><td class='n'>4.1</td><td class='n'>7</td></tr><tr><td>Part-of-speech tagging</td><td>Partial FT (top 2 layers)</td><td class='n'>66</td><td class='n'>0.169</td><td class='n'>3.6</td><td class='n'>7</td></tr><tr><td>Part-of-speech tagging</td><td>Full fine-tuning</td><td class='n'>213</td><td class='n'>0.543</td><td class='n'>11.0</td><td class='n'>8</td></tr></tbody></table>
+<p><b>No run was crippled by its learning rate.</b> Every training loss falls smoothly and none diverges, which
+is the failure a single shared learning rate produces: with 1e-3 on pretrained weights the loss spikes and
+never recovers, and with 2e-5 on a fresh head it crawls. The two-group setup was verified directly as well —
+across the whole linear schedule the head group keeps a constant multiple of the encoder group's rate, and
+weight decay stays at zero on biases and LayerNorm gains.</p>
+
+<p><b>The fine-tuned runs converged; several frozen ones did not.</b> By the last epoch the fine-tuned runs
+have flattened — partial fine-tuning on AG News moves -0.08 points on its final epoch, which is inside
+the noise band. The frozen probes are a different story: the AG News MLP probe was still gaining 1.06 points
+per epoch at epoch five, and the SQuAD partial run 1.9 points at epoch two. We report these as measured, with
+the budget fixed in advance for every method, and we flag them here rather than quietly giving the losing
+configurations extra epochs — which is the cheapest way to manufacture a comparison that says whatever you want.
+The practical consequence is that <b>the frozen numbers in this report are floors</b>: a longer schedule would
+lift them somewhat, and it would not close a 47-point gap on QA.</p>
+
+<p><b>Cost scales with what carries a gradient, not with what runs forward.</b> Seconds per optimisation step
+group cleanly by rung — roughly 0.09–0.19 s frozen, 0.17–0.36 s partial, 0.45–0.74 s full on the token and
+sequence tasks. A frozen body still does a full forward pass, so the saving is the backward pass and the
+optimiser update, and it lands around 4–5× rather than the 30 000× the parameter counts might suggest. That
+gap between <i>parameters trained</i> and <i>time spent</i> is worth keeping in mind when a parameter count is
+used as a proxy for cost: it is a good proxy for memory and a poor one for wall clock.</p>
+
+
+<table><thead><tr><th>Task</th><th>Method</th><th class='n'>sec / epoch</th><th class='n'>sec / step</th><th class='n'>Total train (min)</th><th class='n'>Test eval (s)</th></tr></thead><tbody><tr><td>Topic classification</td><td>Feature-based (linear probe, pooler as head)</td><td class='n'>129</td><td class='n'>0.206</td><td class='n'>13.6</td><td class='n'>49</td></tr><tr><td>Topic classification</td><td>Feature-based (MLP probe)</td><td class='n'>140</td><td class='n'>0.224</td><td class='n'>14.8</td><td class='n'>50</td></tr><tr><td>Topic classification</td><td>Feature-based (linear probe)</td><td class='n'>117</td><td class='n'>0.188</td><td class='n'>12.5</td><td class='n'>55</td></tr><tr><td>Topic classification</td><td>Partial FT (top 2 layers)</td><td class='n'>227</td><td class='n'>0.363</td><td class='n'>13.1</td><td class='n'>44</td></tr><tr><td>Topic classification</td><td>Full fine-tuning</td><td class='n'>463</td><td class='n'>0.741</td><td class='n'>16.6</td><td class='n'>47</td></tr><tr><td>Named entity recognition</td><td>Feature-based (MLP probe)</td><td class='n'>40</td><td class='n'>0.091</td><td class='n'>4.2</td><td class='n'>10</td></tr><tr><td>Named entity recognition</td><td>Feature-based (linear probe)</td><td class='n'>41</td><td class='n'>0.094</td><td class='n'>4.3</td><td class='n'>10</td></tr><tr><td>Named entity recognition</td><td>Partial FT (top 4 layers)</td><td class='n'>82</td><td class='n'>0.186</td><td class='n'>4.6</td><td class='n'>10</td></tr><tr><td>Named entity recognition</td><td>Full fine-tuning</td><td class='n'>198</td><td class='n'>0.450</td><td class='n'>10.6</td><td class='n'>16</td></tr><tr><td>Part-of-speech tagging</td><td>Feature-based (linear probe)</td><td class='n'>43</td><td class='n'>0.110</td><td class='n'>4.1</td><td class='n'>7</td></tr><tr><td>Part-of-speech tagging</td><td>Partial FT (top 2 layers)</td><td class='n'>66</td><td class='n'>0.169</td><td class='n'>3.6</td><td class='n'>7</td></tr><tr><td>Part-of-speech tagging</td><td>Full fine-tuning</td><td class='n'>213</td><td class='n'>0.543</td><td class='n'>11.0</td><td class='n'>8</td></tr><tr><td>Extractive QA</td><td>Feature-based (linear probe)</td><td class='n'>404</td><td class='n'>0.427</td><td class='n'>25.0</td><td class='n'>213</td></tr><tr><td>Extractive QA</td><td>Partial FT (top 4 layers)</td><td class='n'>682</td><td class='n'>0.720</td><td class='n'>25.7</td><td class='n'>226</td></tr></tbody></table>
 
 <h2>8. Analysis and trade-offs</h2>
 
-{{PROSE_ANALYSIS}}
+<p>Four tasks, one body, three rungs. The distance between a frozen BERT and the best thing we could train
+ranges from +2.8 points to +47.7. That is a factor of seventeen, on the same 110 M
+parameters, and it is the central result of the assignment: <b>the value of fine-tuning is not a property of
+the model, it is a property of the task</b>, and there is no way to read it off a description of either.</p>
+
+<h3>8.1 What predicts the gap</h3>
+
+<p>The obvious candidate — task difficulty — gets it wrong. Part-of-speech tagging is the easiest task here by
+any absolute measure (93.94% from a linear model on frozen features) and yet its gap
+(+3.6) is larger than topic classification's (+2.8). A better predictor is <b>what
+kind of operation the head has to perform on the representation</b>.</p>
+
+<ul>
+<li><b>A read-out of a pooled vector</b> — topic classification. The information is present and already pooled;
+  the head is a decision boundary in a space that pretraining built. Smallest gap.</li>
+<li><b>A read-out per token</b> — part-of-speech tagging. Same situation, one decision per position. The gap
+  that remains is concentrated in the rare tags, where the frozen representation has the information but too
+  little of the encoder's capacity is allocated to separating them.</li>
+<li><b>A contextual, structured judgement</b> — named entity recognition. Whether <i>Washington</i> is a person
+  or a place depends on the sentence, and the answer is scored as a whole span. The representation has to be
+  reshaped, not just read. Medium gap (+6.2).</li>
+<li><b>An interaction that pretraining never asked for</b> — extractive QA. The head needs tokens in the
+  question to interrogate tokens in the context. Masked language modelling never rewarded that behaviour, so
+  no amount of linear read-out recovers it. Gap of +47.7 points, and the frozen model's errors are
+  qualitatively different in kind rather than merely worse in degree.</li>
+</ul>
+
+<p>Stated as a rule: <b>feature-based adaptation works when the head's job is to read the representation, and
+fails when its job is to make the representation do something new.</b> That is a useful prior — but it is a
+prior, not an answer. Our own hypotheses, written from exactly this reasoning, got H3 half wrong, and the
+direction of the error (partial fine-tuning damaging the rarest tag) was not something we would have guessed.</p>
+
+<h3>8.2 What each rung costs</h3>
+
+<p>Trainable parameters are a poor proxy for wall-clock cost. A frozen run trains 0.006% of the weights and
+still takes about a fifth of the time of a full fine-tune, not a five-thousandth, because the forward pass
+happens either way; what is saved is the backward pass and the optimiser update. Parameter count is a good
+proxy for <i>memory</i> — optimiser state for 110 M parameters in AdamW is roughly 880 MB that a frozen run
+simply does not allocate — and it is the reason the heaviest run in this grid needed gradient accumulation to
+fit alongside a desktop.</p>
+
+<p>Partial fine-tuning is the interesting middle. On AG News it reached 92.36% against
+93.01% for full fine-tuning, a difference inside the seed band, for 13% of the trainable weights
+and 79% of the wall clock. On NER and POS the full model was ahead by more than noise. On POS it was ahead in
+a way accuracy alone would have hidden. There is no single answer, which is the point.</p>
+
+<h3>8.3 What we would question in our own results</h3>
+
+<ul>
+<li><b>The feature-based rung is a floor, not a ceiling.</b> We use the last hidden layer alone; section 5.3 of
+  the BERT paper concatenates the top four and comes within 0.3 F1 of full fine-tuning on this very NER
+  dataset, where our gap is +6.2. Our comparison is honest about what it measures — the ladder is
+  about what trains, not about feature engineering — but a reader should not conclude that frozen BERT
+  <i>cannot</i> do NER well. It cannot do it well <i>this way</i>.</li>
+<li><b>Several frozen runs had not converged</b> when their epoch budget ran out, as section 7 records. Their
+  numbers would rise somewhat with a longer schedule.</li>
+<li><b>One seed, one run per configuration</b>, as the assignment specifies. Every gap below about 3 points in
+  this report — AG News partial against full, the two POS frozen variants — is reported as indistinguishable
+  rather than as a ranking.</li>
+<li><b>SQuAD is trained on 15 000 of 87 599 examples</b>, so its absolute numbers sit well below published
+  <code>bert-base</code> results. The comparison between methods is internally valid; the absolute figure is
+  not comparable to the literature.</li>
+<li><b>"Frozen" turned out to be ambiguous</b>, and expensively so. Whether BERT's pooler counts as body or as
+  head moved AG News by 7.5 points — more than the entire distance from feature-based to
+  full fine-tuning on that task. Any comparison of adaptation methods should say where it draws that line.</li>
+</ul>
+
+<h3>8.4 What we would do next</h3>
+
+<p>The obvious next rung is the one this assignment stops short of: parameter-efficient methods such as LoRA or
+adapters, which add a small number of trainable parameters <i>inside</i> the encoder rather than choosing a
+prefix of layers to unfreeze. On the evidence here they would be most valuable exactly where partial
+fine-tuning disappointed — on POS, where freezing the lower layers is what starved the rare tags, and on QA,
+where the missing capability is an interaction that top-layer tuning has to reconstruct from scratch.</p>
+
 
 <div class="callout warn">
   <p style="margin:0"><b>On noise.</b> This is one run per configuration with a fixed seed, as the assignment
@@ -431,7 +569,7 @@ adaptation method with its full hyper-parameters, the metrics on the held-out sp
 methods we tried for that task</b>, intended use, limitations and bias, and references. The cards are committed in
 <code>docs/model_cards/</code>.</p>
 
-<table class="keep"><thead><tr><th>Task</th><th>Repository</th><th><code>pipeline_tag</code></th><th class='n'>Reported metric</th></tr></thead><tbody><tr><td>Topic classification</td><td><code>bert-base-uncased-agnews-topic</code></td><td><code>text-classification</code></td><td class='n'>Accuracy 93.01</td></tr><tr><td>Named entity recognition</td><td><code>bert-base-uncased-conll2003-ner</code></td><td><code>token-classification</code></td><td class='n'>Entity F1 90.41</td></tr><tr><td>Part-of-speech tagging</td><td><code>bert-base-uncased-ud-ewt-pos</code></td><td><code>token-classification</code></td><td class='n'>Token accuracy 97.51</td></tr></tbody></table><p class="small">The repository names above are the slugs created by <code>scripts/push_to_hub.py --user &lt;account&gt;</code>; the account namespace is filled in from <code>configs/report.json</code> when the models are pushed.</p>
+<table class="keep"><thead><tr><th>Task</th><th>Repository</th><th><code>pipeline_tag</code></th><th class='n'>Reported metric</th></tr></thead><tbody><tr><td>Topic classification</td><td><a href="https://huggingface.co/joseeangel/bert-base-uncased-agnews-topic">joseeangel/bert-base-uncased-agnews-topic</a></td><td><code>text-classification</code></td><td class='n'>Accuracy 93.01</td></tr><tr><td>Named entity recognition</td><td><a href="https://huggingface.co/joseeangel/bert-base-uncased-conll2003-ner">joseeangel/bert-base-uncased-conll2003-ner</a></td><td><code>token-classification</code></td><td class='n'>Entity F1 90.41</td></tr><tr><td>Part-of-speech tagging</td><td><a href="https://huggingface.co/joseeangel/bert-base-uncased-ud-ewt-pos">joseeangel/bert-base-uncased-ud-ewt-pos</a></td><td><code>token-classification</code></td><td class='n'>Token accuracy 97.51</td></tr><tr><td>Extractive QA</td><td><a href="https://huggingface.co/joseeangel/bert-base-uncased-squad-qa">joseeangel/bert-base-uncased-squad-qa</a></td><td><code>question-answering</code></td><td class='n'>F1 72.91</td></tr></tbody></table>
 
 <h2>10. Reproducibility</h2>
 

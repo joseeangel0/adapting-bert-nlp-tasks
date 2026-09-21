@@ -270,7 +270,7 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
     rec = RunRecord(
         task=task, run_id=run_id, method=method, model_name=model_name, head=head,
         hyperparams={"epochs": epochs, "batch_size": batch_size,
-                     "grad_accum": grad_accum,
+                     "eval_batch_size": eval_batch_size, "grad_accum": grad_accum,
                      "effective_batch_size": batch_size * grad_accum, "head_lr": head_lr,
                      "body_lr": body_lr if method != "frozen" else None,
                      "weight_decay": weight_decay, "warmup_ratio": warmup_ratio,

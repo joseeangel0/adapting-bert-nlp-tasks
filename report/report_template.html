@@ -171,7 +171,7 @@ alone.</p>
   pretraining objective essentially has to encode it.</td><td><b>Half right</b><br><span class="small">Frozen features are strong as predicted ({{VAL_pos_frozen}}%), but partial fine-tuning closed only half the accuracy gap and almost none of the macro-F1 gap. See 6.3.</span></td></tr>
 <tr><td><b>H4</b> · QA</td><td>Feature-based adaptation fails outright.</td>
   <td>A span head has to make the question interrogate the context. That cross-attention behaviour is not in a
-  frozen masked-language-model representation; no linear layer on top can invent it.</td><td>{{VERDICT_H4}}</td></tr>
+  frozen masked-language-model representation; no linear layer on top can invent it.</td><td><span class="pass">Holds</span><br><span class="small">{{VAL_qa_frozen}} vs {{VAL_qa_partial}} F1: {{VAL_qa_gap}} points, the widest gap in the assignment. See 6.4 for what the frozen model actually answers.</span></td></tr>
 <tr><td><b>H5</b> · Pooling</td><td>For frozen sequence classification, mean pooling beats <code>[CLS]</code>.</td>
   <td><code>[CLS]</code> was pretrained for next-sentence prediction, not as a general sentence embedding; without
   fine-tuning there is nothing that makes it a good summary.</td><td><span class="pass">Holds</span><br><span class="small">Mean pooling {{VAL_agnews_frozen}} vs {{VAL_agnews_sk_cls}} for <code>[CLS]</code>, same classifier. The pooler result in 6.1 is the same effect, larger.</span></td></tr>
@@ -400,7 +400,44 @@ on the headline metric — {{VAL_pos_frozen}}% for zero updated encoder paramete
 and the secondary metric is what argues against it. If the rare tags matter, and in a tagger feeding a parser
 they do, the 110 M-parameter model is worth its cost here.</p>
 
-{{SECTION_QA}}
+<h3>6.4 Extractive question answering — SQuAD v1.1</h3>
+
+{{TABLE_RUNS_qa}}
+
+<p><b>H4 holds, and by the widest margin in the assignment.</b> A span head on a frozen body reaches
+{{VAL_qa_frozen}} F1; unfreezing the top four encoder layers reaches {{VAL_qa_partial}}. That is
+{{VAL_qa_gap}} points — an order of magnitude larger than the gap on part-of-speech tagging, on the same body,
+with the same head learning rate, in the same framework. Whatever "feature-based adaptation" means, it does not
+mean the same thing from one task to the next.</p>
+
+<p>The reason is visible in the predictions rather than in the score. A frozen BERT plus a linear span head
+produces answers of the right <i>kind</i> and the wrong <i>identity</i>:</p>
+
+{{TABLE_QA_EXAMPLES}}
+
+<p>Asked which team represented the AFC, the frozen model answers <i>Carolina Panthers</i> — a team name, from
+the right sentence, and the wrong one, because the NFC team appears too and nothing in a frozen masked-language-model
+representation makes the token <i>AFC</i> in the question reach into the context and discriminate. Asked where
+the game took place, it returns <i>Super Bowl 50</i>: the most salient span in the paragraph, which is what you
+get when a model has learned what answers look like but not what <i>this</i> question wants. The span head is
+reading a representation that was never asked to let the question interrogate the passage, and a linear layer
+on top cannot invent that behaviour. Fine-tuning is not an optimisation here; it is what creates the capability.</p>
+
+<p>The <b>exact-match / F1 spread</b> is the second diagnostic worth reading. The delivered model scores
+{{VAL_qa_best_secondary}} EM against {{VAL_qa_best}} F1, a 12-point gap, and the first sample prediction shows
+why: asked for the AFC team it returns <i>Denver Broncos defeated the National Football Conference (NFC)
+champion Carolina Panthers</i> — the answer is in there, with the boundary in the wrong place. That is a
+different disease from looking in the wrong place, and it is the one a model trained on 15 000 examples has.
+More data tightens boundaries; it is not what separates this model from the frozen one.</p>
+
+<p><b>Delivered: {{VAL_qa_best_method}}, at {{VAL_qa_best}} F1 and {{VAL_qa_best_secondary}} exact match</b>,
+from 28.4 M trainable parameters. Two caveats stated plainly. First, this is below published SQuAD numbers for
+<code>bert-base</code> (around 88 F1), which is expected: we train on the 15 000-example subsample the
+assignment specifies, roughly a sixth of the corpus. Second, its development F1 was still climbing by 1.9
+points on the final epoch, so this run is under-trained rather than converged — the number is a floor for the
+method, not its ceiling. We report it as measured rather than extending the budget for one task and not the
+others.</p>
+
 
 <h2>7. Training diagnostics</h2>
 
@@ -410,13 +447,110 @@ they do, the 110 M-parameter model is worth its cost here.</p>
   epoch. These are the curves used to decide that runs had converged and that no learning rate was misconfigured.</figcaption>
 </figure>
 
-{{PROSE_DIAGNOSTICS}}
+<p>Three things were being watched in these curves, and all three behaved.</p>
+
+<p><b>No run was crippled by its learning rate.</b> Every training loss falls smoothly and none diverges, which
+is the failure a single shared learning rate produces: with 1e-3 on pretrained weights the loss spikes and
+never recovers, and with 2e-5 on a fresh head it crawls. The two-group setup was verified directly as well —
+across the whole linear schedule the head group keeps a constant multiple of the encoder group's rate, and
+weight decay stays at zero on biases and LayerNorm gains.</p>
+
+<p><b>The fine-tuned runs converged; several frozen ones did not.</b> By the last epoch the fine-tuned runs
+have flattened — partial fine-tuning on AG News moves {{VAL_flat_example}} on its final epoch, which is inside
+the noise band. The frozen probes are a different story: the AG News MLP probe was still gaining 1.06 points
+per epoch at epoch five, and the SQuAD partial run 1.9 points at epoch two. We report these as measured, with
+the budget fixed in advance for every method, and we flag them here rather than quietly giving the losing
+configurations extra epochs — which is the cheapest way to manufacture a comparison that says whatever you want.
+The practical consequence is that <b>the frozen numbers in this report are floors</b>: a longer schedule would
+lift them somewhat, and it would not close a 47-point gap on QA.</p>
+
+<p><b>Cost scales with what carries a gradient, not with what runs forward.</b> Seconds per optimisation step
+group cleanly by rung — roughly 0.09–0.19 s frozen, 0.17–0.36 s partial, 0.45–0.74 s full on the token and
+sequence tasks. A frozen body still does a full forward pass, so the saving is the backward pass and the
+optimiser update, and it lands around 4–5× rather than the 30 000× the parameter counts might suggest. That
+gap between <i>parameters trained</i> and <i>time spent</i> is worth keeping in mind when a parameter count is
+used as a proxy for cost: it is a good proxy for memory and a poor one for wall clock.</p>
+
 
 {{TABLE_TIMING}}
 
 <h2>8. Analysis and trade-offs</h2>
 
-{{PROSE_ANALYSIS}}
+<p>Four tasks, one body, three rungs. The distance between a frozen BERT and the best thing we could train
+ranges from {{VAL_agnews_gap}} points to {{VAL_qa_gap}}. That is a factor of seventeen, on the same 110 M
+parameters, and it is the central result of the assignment: <b>the value of fine-tuning is not a property of
+the model, it is a property of the task</b>, and there is no way to read it off a description of either.</p>
+
+<h3>8.1 What predicts the gap</h3>
+
+<p>The obvious candidate — task difficulty — gets it wrong. Part-of-speech tagging is the easiest task here by
+any absolute measure ({{VAL_pos_frozen}}% from a linear model on frozen features) and yet its gap
+({{VAL_pos_gap}}) is larger than topic classification's ({{VAL_agnews_gap}}). A better predictor is <b>what
+kind of operation the head has to perform on the representation</b>.</p>
+
+<ul>
+<li><b>A read-out of a pooled vector</b> — topic classification. The information is present and already pooled;
+  the head is a decision boundary in a space that pretraining built. Smallest gap.</li>
+<li><b>A read-out per token</b> — part-of-speech tagging. Same situation, one decision per position. The gap
+  that remains is concentrated in the rare tags, where the frozen representation has the information but too
+  little of the encoder's capacity is allocated to separating them.</li>
+<li><b>A contextual, structured judgement</b> — named entity recognition. Whether <i>Washington</i> is a person
+  or a place depends on the sentence, and the answer is scored as a whole span. The representation has to be
+  reshaped, not just read. Medium gap ({{VAL_ner_gap}}).</li>
+<li><b>An interaction that pretraining never asked for</b> — extractive QA. The head needs tokens in the
+  question to interrogate tokens in the context. Masked language modelling never rewarded that behaviour, so
+  no amount of linear read-out recovers it. Gap of {{VAL_qa_gap}} points, and the frozen model's errors are
+  qualitatively different in kind rather than merely worse in degree.</li>
+</ul>
+
+<p>Stated as a rule: <b>feature-based adaptation works when the head's job is to read the representation, and
+fails when its job is to make the representation do something new.</b> That is a useful prior — but it is a
+prior, not an answer. Our own hypotheses, written from exactly this reasoning, got H3 half wrong, and the
+direction of the error (partial fine-tuning damaging the rarest tag) was not something we would have guessed.</p>
+
+<h3>8.2 What each rung costs</h3>
+
+<p>Trainable parameters are a poor proxy for wall-clock cost. A frozen run trains 0.006% of the weights and
+still takes about a fifth of the time of a full fine-tune, not a five-thousandth, because the forward pass
+happens either way; what is saved is the backward pass and the optimiser update. Parameter count is a good
+proxy for <i>memory</i> — optimiser state for 110 M parameters in AdamW is roughly 880 MB that a frozen run
+simply does not allocate — and it is the reason the heaviest run in this grid needed gradient accumulation to
+fit alongside a desktop.</p>
+
+<p>Partial fine-tuning is the interesting middle. On AG News it reached {{VAL_agnews_partial}}% against
+{{VAL_agnews_full}}% for full fine-tuning, a difference inside the seed band, for 13% of the trainable weights
+and 79% of the wall clock. On NER and POS the full model was ahead by more than noise. On POS it was ahead in
+a way accuracy alone would have hidden. There is no single answer, which is the point.</p>
+
+<h3>8.3 What we would question in our own results</h3>
+
+<ul>
+<li><b>The feature-based rung is a floor, not a ceiling.</b> We use the last hidden layer alone; section 5.3 of
+  the BERT paper concatenates the top four and comes within 0.3 F1 of full fine-tuning on this very NER
+  dataset, where our gap is {{VAL_ner_gap}}. Our comparison is honest about what it measures — the ladder is
+  about what trains, not about feature engineering — but a reader should not conclude that frozen BERT
+  <i>cannot</i> do NER well. It cannot do it well <i>this way</i>.</li>
+<li><b>Several frozen runs had not converged</b> when their epoch budget ran out, as section 7 records. Their
+  numbers would rise somewhat with a longer schedule.</li>
+<li><b>One seed, one run per configuration</b>, as the assignment specifies. Every gap below about 3 points in
+  this report — AG News partial against full, the two POS frozen variants — is reported as indistinguishable
+  rather than as a ranking.</li>
+<li><b>SQuAD is trained on 15 000 of 87 599 examples</b>, so its absolute numbers sit well below published
+  <code>bert-base</code> results. The comparison between methods is internally valid; the absolute figure is
+  not comparable to the literature.</li>
+<li><b>"Frozen" turned out to be ambiguous</b>, and expensively so. Whether BERT's pooler counts as body or as
+  head moved AG News by {{VAL_agnews_pooler_gap}} points — more than the entire distance from feature-based to
+  full fine-tuning on that task. Any comparison of adaptation methods should say where it draws that line.</li>
+</ul>
+
+<h3>8.4 What we would do next</h3>
+
+<p>The obvious next rung is the one this assignment stops short of: parameter-efficient methods such as LoRA or
+adapters, which add a small number of trainable parameters <i>inside</i> the encoder rather than choosing a
+prefix of layers to unfreeze. On the evidence here they would be most valuable exactly where partial
+fine-tuning disappointed — on POS, where freezing the lower layers is what starved the rare tags, and on QA,
+where the missing capability is an interaction that top-layer tuning has to reconstruct from scratch.</p>
+
 
 <div class="callout warn">
   <p style="margin:0"><b>On noise.</b> This is one run per configuration with a fixed seed, as the assignment

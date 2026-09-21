@@ -84,9 +84,19 @@ docs/VERIFICATION.md       requisito -> implementacion -> evidencia, punto por p
 docs/model_cards/          the model card pushed with each published model
 ```
 
-## Publishing
+## Published models
 
-Step-by-step (in Spanish): [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+| Task | Model | Delivered method | Score |
+|---|---|---|---|
+| Topic classification | [`joseeangel/bert-base-uncased-agnews-topic`](https://huggingface.co/joseeangel/bert-base-uncased-agnews-topic) | Full fine-tuning | 93.01 accuracy |
+| Named entity recognition | [`joseeangel/bert-base-uncased-conll2003-ner`](https://huggingface.co/joseeangel/bert-base-uncased-conll2003-ner) | Full fine-tuning | 90.41 entity F1 |
+| Part-of-speech tagging | [`joseeangel/bert-base-uncased-ud-ewt-pos`](https://huggingface.co/joseeangel/bert-base-uncased-ud-ewt-pos) | Full fine-tuning | 97.51 token accuracy |
+| Extractive QA | [`joseeangel/bert-base-uncased-squad-qa`](https://huggingface.co/joseeangel/bert-base-uncased-squad-qa) | Partial FT (top 4 layers) | 72.91 F1 |
+
+Each card carries the training data and licence, the adaptation method with its hyper-parameters,
+the held-out metrics, **the full table of every method we tried for that task**, intended use,
+limitations and references. Step-by-step for republishing (in Spanish):
+[`docs/PUBLISHING.md`](docs/PUBLISHING.md).
 
 ```bash
 .venv/bin/python scripts/push_to_hub.py --user <hf-username> --dry-run   # write cards only

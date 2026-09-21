@@ -4,9 +4,11 @@ Every saved checkpoint is reloaded from disk and its held-out metric recomputed,
 
 | Task | Run | Metric | Reported | Recomputed | Δ |
 |---|---|---|---:|---:|---:|
-| agnews | `frozen_mlp_bert-base-uncased` | Accuracy | 84.579 | 84.579 | 0.0000 |
-| agnews | `frozen_linear_bert-base-uncased` | Accuracy | 82.092 | 82.092 | 0.0000 |
+| agnews | `full_ft_linear_bert-base-uncased` | Accuracy | 93.013 | 93.013 | 0.0000 |
+| ner | `full_ft_linear_bert-base-uncased` | Entity F1 | 90.413 | 90.413 | 0.0000 |
+| pos | `full_ft_linear_bert-base-uncased` | Token accuracy | 97.513 | 97.513 | 0.0000 |
+| qa | `partial_ft4_linear_bert-base-uncased` | F1 | 72.910 | 72.918 | 0.0080 ❌ |
 
 Tolerance 0.0001; reductions on GPU/MPS are not bit-exact, so the last decimal is allowed to move.
 
-**2/2 checkpoints reproduce their reported metric.**
+**3/4 checkpoints reproduce their reported metric.**

@@ -24,7 +24,7 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
 | 1.6 | La etiqueta va en el primer sub-token; `-100` en el resto | `src/encoding.py::align_labels`, usado por NER, POS y —en su forma de span— por QA | `sanity_check.txt`; `data_checks.md`: invariantes en 1 000 oraciones por tarea | ✅ |
 | 1.7 | Imprimir un batch con tokens junto a sus etiquetas antes de entrenar | `scripts/sanity_check.py`, ejecutado antes de la parrilla | `sanity_check.txt` | ✅ |
 | 1.8 | `bert-base` como cuerpo de los modelos entregados | `configs/experiments.py::BODY = "bert-base-uncased"` | los 20 runs de `GRID` usan ese cuerpo | ✅ |
-| 1.9 | *(Opcional)* DistilBERT / BERT-large como benchmark de tamaño | `configs/experiments.py::OPTIONAL`, `run_experiments.py --optional` | `results/*/…distilbert…json` | {{OPTIONAL_STATUS}} |
+| 1.9 | *(Opcional)* DistilBERT / BERT-large como benchmark de tamaño | `configs/experiments.py::OPTIONAL`, `run_experiments.py --optional` | `results/*/…distilbert…json` | — no ejecutado (el enunciado lo marca como opcional; el tiempo de GPU se destinó a cubrir los tres escalones en las cuatro tareas). `run_experiments.py --optional` lo corre. |
 | 1.10 | HuggingFace Transformers, Tokenizers, Datasets y `Trainer` | `datasets.load_dataset`, `AutoTokenizer` rápido (los `word_ids()` son la base de la alineación), `Trainer` con subclases propias | `requirements.txt` con versiones fijas | ✅ |
 
 ### Parte 2 — Experimentos
@@ -62,9 +62,9 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
 
 | # | Requisito | Implementación | Evidencia | Estado |
 |---|---|---|---|---|
-| 5.1 | Publicar los cuatro modelos finales y sus tokenizers en el Hub | `scripts/push_to_hub.py` sube la carpeta del checkpoint, que incluye el tokenizer | {{HUB_STATUS}} | {{HUB_MARK}} |
+| 5.1 | Publicar los cuatro modelos finales y sus tokenizers en el Hub | `scripts/push_to_hub.py` sube la carpeta del checkpoint, que incluye el tokenizer | 4 repos públicos bajo `joseeangel`, verificados descargándolos de vuelta del Hub: [agnews](https://huggingface.co/joseeangel/bert-base-uncased-agnews-topic) · [ner](https://huggingface.co/joseeangel/bert-base-uncased-conll2003-ner) · [pos](https://huggingface.co/joseeangel/bert-base-uncased-ud-ewt-pos) · [qa](https://huggingface.co/joseeangel/bert-base-uncased-squad-qa) | ✅ |
 | 5.2 | Model card con datos de entrenamiento, métricas, uso previsto, limitaciones y referencias | `push_to_hub.py::card`, generada desde el mismo `results/*.json` que produjo el reporte | `docs/model_cards/` | ✅ |
-| 5.3 | Si es privado, dar acceso a `Dexterg83` | los repos se crean públicos por defecto (`--private` los hace privados) | {{HUB_STATUS}} | {{HUB_MARK}} |
+| 5.3 | Si es privado, dar acceso a `Dexterg83` | no aplica: los cuatro repos son **públicos**, cualquiera entra con el enlace | 4 repos públicos bajo `joseeangel`, verificados descargándolos de vuelta del Hub: [agnews](https://huggingface.co/joseeangel/bert-base-uncased-agnews-topic) · [ner](https://huggingface.co/joseeangel/bert-base-uncased-conll2003-ner) · [pos](https://huggingface.co/joseeangel/bert-base-uncased-ud-ewt-pos) · [qa](https://huggingface.co/joseeangel/bert-base-uncased-squad-qa) | ✅ |
 
 ### Entregables
 
@@ -73,7 +73,7 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
 | E.1 | Código: scripts, notebooks, configs, requirements | `src/`, `scripts/`, `notebooks/U2T01_colab.ipynb`, `configs/`, `requirements.txt` con versiones exactas | ✅ |
 | E.2 | Semillas fijas y documentación para replicar el proceso | semilla 42 en todos lados; `README.md` § *Reproduce it* y sección 10 del reporte | ✅ |
 | E.3 | Reporte en PDF | `report/U2T01_report.pdf` | ✅ |
-| E.4 | Repos en el HuggingFace Hub | {{HUB_STATUS}} | {{HUB_MARK}} |
+| E.4 | Repos en el HuggingFace Hub | 4 repos públicos bajo `joseeangel`, verificados descargándolos de vuelta del Hub: [agnews](https://huggingface.co/joseeangel/bert-base-uncased-agnews-topic) · [ner](https://huggingface.co/joseeangel/bert-base-uncased-conll2003-ner) · [pos](https://huggingface.co/joseeangel/bert-base-uncased-ud-ewt-pos) · [qa](https://huggingface.co/joseeangel/bert-base-uncased-squad-qa) | ✅ |
 
 ## Decisiones que se apartan del camino obvio, y por qué
 

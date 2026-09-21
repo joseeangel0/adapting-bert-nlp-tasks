@@ -26,6 +26,11 @@ REPORT = ROOT / "report"
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
+def lower_metric(name: str) -> str:
+    """Metric name mid-sentence: 'accuracy', 'entity F1' - never 'entity f1'."""
+    return name if name == "F1" else name[0].lower() + name[1:]
+
+
 def fmt(v, digits=2):
     return "-" if v is None else f"{v:.{digits}f}"
 
@@ -82,7 +87,7 @@ def table_delivered() -> str:
             "pos": "bert-base-uncased-ud-ewt-pos", "qa": "bert-base-uncased-squad-qa"}
     body = "".join(
         f"<tr><td>{TASK_TITLES[t]}</td><td><code>{slug[t]}</code></td><td>{r['method']}</td>"
-        f"<td class='n'><b>{fmt(r['headline'])}</b> {HEADLINE[t][1].lower()}</td>"
+        f"<td class='n'><b>{fmt(r['headline'])}</b> {lower_metric(HEADLINE[t][1])}</td>"
         f"<td class='n'>{r['trainable']:,}</td></tr>"
         for t, r in sorted(best.items(), key=lambda kv: TASK_ORDER.index(kv[0])))
     return f'<table class="keep"><thead>{head}</thead><tbody>{body}</tbody></table>'
@@ -178,7 +183,7 @@ def values() -> dict[str, str]:
         b = best[task]
         out[f"VAL_{task}_best"] = fmt(b["headline"])
         out[f"VAL_{task}_best_method"] = b["method"]
-        out[f"VAL_{task}_metric"] = HEADLINE[task][1].lower()
+        out[f"VAL_{task}_metric"] = lower_metric(HEADLINE[task][1])
         for rung in ("frozen", "partial", "full"):
             cand = [r for r in rs if r["rung"] == rung]
             if cand:
@@ -186,9 +191,13 @@ def values() -> dict[str, str]:
                 out[f"VAL_{task}_{rung}"] = fmt(top["headline"])
                 out[f"VAL_{task}_{rung}_method"] = top["method"]
                 out[f"VAL_{task}_{rung}_min"] = f"{top['minutes']:.1f}"
-        if "VAL_%s_frozen" % task in out and "VAL_%s_full" % task in out:
-            gap = float(out[f"VAL_{task}_full"]) - float(out[f"VAL_{task}_frozen"])
+        # The gap is best-known-method minus best-frozen, not full minus frozen: on SQuAD the
+        # best method we measured is partial fine-tuning, and quoting a missing run would be worse
+        # than quoting the one that won.
+        if f"VAL_{task}_frozen" in out:
+            gap = b["headline"] - float(out[f"VAL_{task}_frozen"])
             out[f"VAL_{task}_gap"] = f"{gap:+.1f}"
+        out[f"VAL_{task}_best_secondary"] = fmt(b["secondary"])
     # Specific runs the prose names directly, looked up by run id so a sentence can never
     # quote a number that belongs to a different experiment.
     by_id = {(r["task"], r["run_id"]): r for r in data}
@@ -206,6 +215,16 @@ def values() -> dict[str, str]:
     ner_mlp = by_id.get(("ner", "frozen_mlp_bert-base-uncased"))
     if ner_sk and ner_mlp and ner_sk["headline"] and ner_mlp["headline"]:
         out["VAL_ner_probe_gain"] = f"{ner_mlp['headline'] - ner_sk['headline']:.1f}"
+
+    a = by_id.get(("agnews", "frozen_linear_bert-base-uncased"))
+    b_ = by_id.get(("agnews", "frozen_linear-pooler_bert-base-uncased"))
+    if a and b_:
+        out["VAL_agnews_pooler_gap"] = f"{b_['headline'] - a['headline']:.1f}"
+
+    flat = by_id.get(("agnews", "partial_ft2_linear_bert-base-uncased"))
+    if flat:
+        ev = [e["eval_accuracy"] for e in flat["raw"]["train_log"] if "eval_accuracy" in e]
+        out["VAL_flat_example"] = (f"{(ev[-1] - ev[-2]) * 100:+.2f} points" if len(ev) > 1 else "—")
 
     out["VAL_pos_sk_macro"] = one("pos", "frozen_sk-logreg_firstsub_bert-base-uncased", "secondary")
     out["VAL_pos_partial_macro"] = one("pos", "partial_ft2_linear_bert-base-uncased", "secondary")
