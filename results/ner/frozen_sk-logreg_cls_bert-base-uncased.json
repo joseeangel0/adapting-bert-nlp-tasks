@@ -1,0 +1,118 @@
+{
+  "task": "ner",
+  "run_id": "frozen_sk-logreg_cls_bert-base-uncased",
+  "method": "frozen",
+  "model_name": "bert-base-uncased",
+  "head": "sklearn:logreg",
+  "hyperparams": {
+    "estimator": "logreg",
+    "pooling": "cls",
+    "params": {
+      "C": 1.0,
+      "class_weight": null,
+      "dual": false,
+      "fit_intercept": true,
+      "intercept_scaling": 1,
+      "l1_ratio": 0.0,
+      "max_iter": 1000,
+      "n_jobs": -1,
+      "penalty": "deprecated",
+      "random_state": 42,
+      "solver": "lbfgs",
+      "tol": 0.0001,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "max_length": 192
+  },
+  "params": {
+    "total_params": 109482240,
+    "trainable_params": 0,
+    "trainable_pct": 0.0,
+    "learner_params": 6921,
+    "note": "0 BERT parameters updated; the learner sits on top of frozen features"
+  },
+  "metrics": {
+    "entity_f1": 0.77842,
+    "entity_precision": 0.74723,
+    "entity_recall": 0.81232,
+    "token_accuracy": 0.96098,
+    "per_entity": {
+      "LOC": {
+        "precision": 0.7894,
+        "recall": 0.8585,
+        "f1-score": 0.8225,
+        "support": 1668.0
+      },
+      "MISC": {
+        "precision": 0.5844,
+        "recall": 0.661,
+        "f1-score": 0.6203,
+        "support": 702.0
+      },
+      "ORG": {
+        "precision": 0.6672,
+        "recall": 0.752,
+        "f1-score": 0.707,
+        "support": 1661.0
+      },
+      "PER": {
+        "precision": 0.8693,
+        "recall": 0.8924,
+        "f1-score": 0.8807,
+        "support": 1617.0
+      }
+    },
+    "n_sentences": 3453,
+    "n_tokens": 46435
+  },
+  "train_log": [],
+  "epoch_times": [
+    {
+      "stage": "feature extraction",
+      "seconds": 64.52
+    },
+    {
+      "stage": "estimator fit",
+      "seconds": 7.81
+    },
+    {
+      "stage": "predict test",
+      "seconds": 0.03
+    }
+  ],
+  "train_seconds": 7.81,
+  "eval_seconds": 0.03,
+  "dataset": {
+    "source": "lhoestq/conll2003",
+    "license": "Reuters corpus terms / research use (CoNLL-2003 shared task)",
+    "citation": "Tjong Kim Sang & De Meulder (2003), CoNLL-2003 shared task: language-independent NER",
+    "sizes": {
+      "train": 14041,
+      "dev": 3250,
+      "test": 3453
+    },
+    "num_labels": 9,
+    "labels": [
+      "O",
+      "B-PER",
+      "I-PER",
+      "B-ORG",
+      "I-ORG",
+      "B-LOC",
+      "I-LOC",
+      "B-MISC",
+      "I-MISC"
+    ]
+  },
+  "env": {
+    "python": "3.12.13",
+    "torch": "2.14.0",
+    "device": "mps",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "chip": "Apple M5"
+  },
+  "seed": 42,
+  "notes": "fit on 150,000 of 203,621 training tokens"
+}

@@ -273,7 +273,88 @@ those files, so the prose cannot drift away from the numbers.</p>
   log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying for.</figcaption>
 </figure>
 
-{{SECTION_PER_TASK}}
+<h3>6.1 Topic classification — AG News</h3>
+
+{{TABLE_RUNS_agnews}}
+
+<p>This is the task where the feature-based rung defends itself. A logistic regression on frozen, mean-pooled
+last hidden states reaches {{VAL_agnews_frozen}}% accuracy — {{VAL_agnews_gap}} points below full fine-tuning,
+for zero updated BERT parameters and {{VAL_agnews_frozen_min}} minutes including feature extraction. <b>H1 holds.</b>
+Topic is a document-level, largely lexical decision, and a pooled sentence vector already separates
+<i>Sports</i> from <i>Business</i>; what fine-tuning adds is mostly the <i>Business</i> / <i>Sci-Tech</i>
+boundary, which is where the confusion matrices of all our models concentrate their errors.</p>
+
+<p>Two comparisons inside the frozen rung are worth more than the headline number.</p>
+
+<p><b>Which vector you pool matters more than which classifier you use.</b> Mean pooling beats
+<code>[CLS]</code> by 1.6 points with the same logistic regression, while swapping logistic regression for a
+linear SVM on the same <code>[CLS]</code> features moves 0.6 points and a random forest loses 3.7.
+<b>H5 holds</b>, and the reason is architectural: <code>[CLS]</code> was pretrained to carry a next-sentence
+prediction decision, not to be a sentence embedding. Nothing in the pretraining objective makes it a good
+summary of the text until fine-tuning teaches it to be one. The random forest result is the expected one —
+axis-aligned splits are a poor fit for a dense 768-dimensional space where the signal is spread across
+directions rather than concentrated in individual coordinates.</p>
+
+<div class="callout">
+<p style="margin:0 0 4pt"><b>The pooler is a bottleneck, and it is worth 6.5 points.</b></p>
+<p style="margin:0">Our PyTorch linear probe scored {{VAL_agnews_probe_linear}}% while a logistic regression
+on the same frozen model scored {{VAL_agnews_sk_cls}}%. Both are linear models on a frozen BERT, so the gap
+should have been noise. It is not, and the cause is that
+<code>BertForSequenceClassification</code> does not classify the raw <code>[CLS]</code> state: it classifies
+<code>tanh(dense([CLS]))</code>, BERT's <i>pooler</i>, a projection pretrained for next-sentence prediction.
+Frozen, that tanh-saturated NSP vector is what the probe has to work with. Giving the head more capacity
+barely helps — an MLP probe on the same frozen pooler reaches only {{VAL_agnews_probe_mlp}}% — but letting the
+pooler count as head instead of as frozen body recovers the gap at
+{{VAL_agnews_probe_pooler}}%, with still zero encoder parameters updated. The lesson generalises: <i>frozen</i>
+is not a single thing, and where you draw the line between body and head changes the answer more than the
+choice of classifier does.</p>
+</div>
+
+<p><b>Delivered: {{VAL_agnews_best_method}}, at {{VAL_agnews_best}}% accuracy.</b> Partial fine-tuning of the
+top two layers reaches {{VAL_agnews_partial}}% with 14.2 M trainable parameters against full fine-tuning's
+110 M — {{VAL_agnews_full}}% for eight times the trainable weights. That difference sits inside the ±1–3 point
+seed band the assignment warns about, so we do not claim full fine-tuning is better here; we claim the two are
+indistinguishable at this sample size and that <b>partial fine-tuning is the better engineering choice</b>.
+We publish the full fine-tuned model only because it is marginally ahead on the measurement we actually have,
+and we say plainly in its model card that the partial variant is within noise at a fraction of the cost.</p>
+
+<h3>6.2 Named entity recognition — CoNLL-2003</h3>
+
+{{TABLE_RUNS_ner}}
+
+<p><b>H2 holds, and the metric choice is what makes it visible.</b> The frozen probe reaches
+{{VAL_ner_frozen}} entity F1 against {{VAL_ner_full}} for full fine-tuning — a gap of
+{{VAL_ner_gap}} points, far outside seed noise. Token accuracy tells a completely different and much more
+flattering story: the same frozen probe is already above 97% there, because 82.5% of CoNLL test tokens are
+<code>O</code> and a model that finds nothing at all still scores in the eighties. Entity-level F1 is the
+honest measure, because the unit of correctness is the whole span with its type; recovering
+<code>B-PER</code> but missing the <code>I-PER</code> that follows it is a wrong answer, not a half-right one.</p>
+
+<p>Unlike topic classification, this task genuinely needs the encoder reshaped. Deciding that <i>Washington</i>
+is a person here and a location there is a contextual, structured judgement, and a linear read-out of the last
+layer has no mechanism to make it. Head capacity helps a little — the MLP probe gains
+{{VAL_ner_probe_gain}} points over logistic regression on the same frozen features — but it plateaus well
+below anything that touches the encoder, which is exactly the signature of a representation that lacks the
+information rather than a head that lacks the power to extract it.</p>
+
+<p>Our frozen number is well below the roughly 0.3 F1 gap the BERT paper reports for feature-based adaptation
+on this dataset, and the difference is not a contradiction: section 5.3 of the paper concatenates the top four
+hidden layers as features, while we use the last layer alone. That is a deliberate scope decision — the
+assignment's ladder is about what trains, not about feature engineering on top of a frozen body — but it does
+mean our feature-based rung is a floor for the method rather than its ceiling.</p>
+
+<figure>
+  <img src="figures/ner_entities.png" alt="F1 per entity type for each adaptation method">
+  <figcaption>Figure 4 — F1 per entity type. <code>MISC</code> is the weakest class for every method, which is
+  expected: it is a residual category holding nationalities, events and adjectival forms with far less internal
+  consistency than <code>PER</code>, <code>ORG</code> or <code>LOC</code>.</figcaption>
+</figure>
+
+<p><b>Delivered: {{VAL_ner_best_method}}, at {{VAL_ner_best}} entity F1.</b> Here the extra cost of fine-tuning
+buys something that clearly exceeds the noise band, so the top of the ladder is the right answer and the
+rejected alternatives make the case for it.</p>
+
+{{SECTION_POS_QA}}
 
 <h2>7. Training diagnostics</h2>
 

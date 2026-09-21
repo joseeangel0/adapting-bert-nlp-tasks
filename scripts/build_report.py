@@ -189,6 +189,24 @@ def values() -> dict[str, str]:
         if "VAL_%s_frozen" % task in out and "VAL_%s_full" % task in out:
             gap = float(out[f"VAL_{task}_full"]) - float(out[f"VAL_{task}_frozen"])
             out[f"VAL_{task}_gap"] = f"{gap:+.1f}"
+    # Specific runs the prose names directly, looked up by run id so a sentence can never
+    # quote a number that belongs to a different experiment.
+    by_id = {(r["task"], r["run_id"]): r for r in data}
+
+    def one(task: str, run_id: str) -> str:
+        r = by_id.get((task, run_id))
+        return fmt(r["headline"]) if r and r["headline"] is not None else "—"
+
+    out["VAL_agnews_probe_linear"] = one("agnews", "frozen_linear_bert-base-uncased")
+    out["VAL_agnews_probe_mlp"] = one("agnews", "frozen_mlp_bert-base-uncased")
+    out["VAL_agnews_probe_pooler"] = one("agnews", "frozen_linear-pooler_bert-base-uncased")
+    out["VAL_agnews_sk_cls"] = one("agnews", "frozen_sk-logreg_cls_bert-base-uncased")
+
+    ner_sk = by_id.get(("ner", "frozen_sk-logreg_firstsub_bert-base-uncased"))
+    ner_mlp = by_id.get(("ner", "frozen_mlp_bert-base-uncased"))
+    if ner_sk and ner_mlp and ner_sk["headline"] and ner_mlp["headline"]:
+        out["VAL_ner_probe_gain"] = f"{ner_mlp['headline'] - ner_sk['headline']:.1f}"
+
     cfg = json.loads((ROOT / "configs" / "report.json").read_text())
     out["TEAM"] = " &middot; ".join(n.replace(" ", "&nbsp;") for n in cfg["team"])
     out["REPO_URL"] = cfg.get("repo_url") or "local repository (not published)"

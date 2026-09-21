@@ -86,6 +86,8 @@ docs/model_cards/          the model card pushed with each published model
 
 ## Publishing
 
+Step-by-step (in Spanish): [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+
 ```bash
 .venv/bin/python scripts/push_to_hub.py --user <hf-username> --dry-run   # write cards only
 hf auth login                                                            # or export HF_TOKEN
