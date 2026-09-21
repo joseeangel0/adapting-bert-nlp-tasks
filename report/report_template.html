@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>U2T01 — Adapting BERT for NLP tasks</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --ink: #111; --ink2: #4a4a47; --muted: #85837d; --rule: #dedcd5; --accent: #1c5cab; --bg2: #f5f4f0; }
+  * { box-sizing: border-box; }
+  body { font: 10.2pt/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); margin: 0; }
+  h1 { font-size: 23pt; margin: 0 0 4pt; letter-spacing: -.01em; }
+  h2 { font-size: 14.5pt; margin: 20pt 0 6pt; padding-top: 4pt; border-top: 2px solid var(--ink); break-after: avoid; }
+  h3 { font-size: 11pt; margin: 12pt 0 4pt; break-after: avoid; }
+  p { margin: 4pt 0 6pt; }
+  ul, ol { margin: 4pt 0 6pt; padding-left: 16pt; }
+  li { margin: 1.5pt 0; }
+  code, .mono { font-family: Menlo, Consolas, monospace; font-size: 8.6pt; background: var(--bg2); padding: 0 2pt; border-radius: 2pt; }
+  pre { font-family: Menlo, Consolas, monospace; font-size: 8.2pt; background: var(--bg2); padding: 6pt 8pt; border-radius: 4pt; white-space: pre-wrap; margin: 4pt 0 8pt; break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 8.8pt; break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { text-align: left; font-weight: 600; color: var(--ink2); border-bottom: 1.2px solid var(--ink); padding: 3pt 5pt; vertical-align: bottom; }
+  td { border-bottom: 1px solid var(--rule); padding: 3pt 5pt; vertical-align: top; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .best { font-weight: 700; }
+  figure { margin: 8pt 0 12pt; break-inside: avoid; }
+  table.keep { break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--rule); border-radius: 4pt; }
+  figcaption { font-size: 8.6pt; color: var(--ink2); margin-top: 4pt; }
+  .cover { border-bottom: 1px solid var(--rule); padding-bottom: 10pt; margin-bottom: 8pt; }
+  .kicker { font-size: 9pt; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .subtitle { font-size: 11.5pt; color: var(--ink2); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; }
+  .box { border: 1px solid var(--rule); border-radius: 5pt; padding: 7pt 9pt; break-inside: avoid; }
+  .box h4 { margin: 0 0 3pt; font-size: 9.6pt; }
+  .box p, .box li { font-size: 9pt; }
+  .callout { border-left: 3px solid var(--accent); background: #f2f6fc; padding: 6pt 9pt; margin: 6pt 0 10pt; break-inside: avoid; }
+  .callout.warn { border-color: #d49a14; background: #fcf7ea; }
+  .pagebreak { break-before: page; }
+  .small { font-size: 8.6pt; color: var(--ink2); }
+  .toc { columns: 2; font-size: 9.4pt; margin: 6pt 0; padding-left: 14pt; }
+  .pass { color: #0a7a0a; font-weight: 700; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 7.8pt; padding: 0 4pt; border-radius: 3pt; background: var(--bg2); color: var(--ink2); }
+</style>
+</head>
+<body>
+<body>
+
+<section class="cover">
+  <div class="kicker">Trends in Data Science · Unit 2 · Task 01</div>
+  <h1>Adapting BERT for NLP tasks</h1>
+  <div class="subtitle">One pretrained <code>bert-base-uncased</code> body, four classical NLP tasks, and
+    three rungs of the adaptation ladder. For every task the delivered model is the one the measurements
+    chose, reported next to the alternatives we trained and rejected.</div>
+  <p style="margin:8pt 0 2pt"><b>Team:</b> {{TEAM}}<br>
+  <b>Professor:</b> Dexter Gomez · <b>Course:</b> Trends in Data Science · <b>Date:</b> September 2026<br>
+  <b>Repository:</b> {{REPO_URL}}</p>
+  <p class="small" style="margin-top:6pt">Deliverables: this report, the code that produced every number in it
+    (<code>scripts/run_experiments.py</code> reruns the whole grid), and four published models with model cards.
+    Environment: {{VAL_env}} · {{VAL_total_runs}} runs · {{VAL_total_minutes}} minutes of training.</p>
+</section>
+
+<ol class="toc">
+  <li>What we delivered</li>
+  <li>Task environment</li>
+  <li>Hypotheses</li>
+  <li>The adaptation ladder, concretely</li>
+  <li>Metrics and evaluation</li>
+  <li>Results</li>
+  <li>Training diagnostics</li>
+  <li>Analysis and trade-offs</li>
+  <li>Publishing</li>
+  <li>Reproducibility</li>
+  <li>References</li>
+</ol>
+
+<h2>1. What we delivered</h2>
+
+{{TABLE_DELIVERED}}
+
+<p>Each of these four models was selected against alternatives trained by us on the same data with the same
+seed, and every rejected alternative is reported with its numbers in section 6. The short version of what the
+measurements say:</p>
+
+<div class="callout">
+  <p style="margin:0"><b>The gap between a frozen BERT and a fine-tuned one is not a property of BERT — it is a
+  property of the task.</b> It is {{VAL_pos_gap}} points on part-of-speech tagging, where the information the head
+  needs is already sitting in the pretrained representation, and {{VAL_qa_gap}} points on extractive QA, where it
+  is not. Choosing the rung of the ladder without measuring is choosing blind.</p>
+</div>
+
+<h2>2. Task environment</h2>
+
+<p>All four tasks share one body, <code>bert-base-uncased</code> (110 M parameters, 12 encoder layers, hidden
+size 768). Only the head changes: a sequence classifier over <code>[CLS]</code> for topic classification, a
+per-token classifier for NER and POS, and a two-logit span head (start, end) for extractive QA.</p>
+
+{{TABLE_DATASETS}}
+
+<p>AG News ships no development split, so we carved one out of the training pool with the fixed seed: 20 000 rows
+for training, 5 000 held out to watch the epochs, and the official 7 600-row test set kept untouched for the
+numbers in this report. SQuAD is subsampled to 15 000 training examples as the assignment specifies; its test
+split is not public, so — as is standard for SQuAD v1.1 — the 10 570-question development set is the held-out
+evaluation set, and a fixed 3 000-question subsample of it is used for the cheaper per-epoch monitoring.</p>
+
+<h3>Subword handling</h3>
+
+<p>The tokenizer splits words into pieces (<code>playing</code> → <code>play</code> + <code>##ing</code>) but the
+datasets carry one label per whole word. We follow the standard convention: <b>the label goes on the first subword
+of each word</b>, and every other position — continuation subwords, <code>[CLS]</code>, <code>[SEP]</code>,
+padding — gets <code>-100</code>, the index <code>CrossEntropyLoss</code> ignores. The same first-subword position
+is used when extracting frozen features, so features and labels stay aligned by construction rather than by luck.</p>
+
+<p>This is the failure mode that does not announce itself: a misalignment either crashes on mismatched lengths or,
+far worse, trains quietly against shifted labels and produces a healthy-looking loss curve. So before any training
+ran, <code>scripts/sanity_check.py</code> printed tokens next to their labels and checked the invariants. Its
+output is committed as <code>docs/sanity_check.txt</code>; an extract:</p>
+
+<pre>=== ner: subword/label alignment (bert-base-uncased) ===
+subword          word_id   label  tag
+[CLS]               None    -100  (ignored)
+eu                     0       3  B-ORG
+rejects                1       0  O
+german                 2       7  B-MISC
+...
+peter                  0       1  B-PER
+blackburn              1       2  I-PER
+
+invariant check: {"checked": 500, "length_mismatches": 0,
+                  "truncated_sentences": 0, "unexplained_label_loss": 0, "passed": true}</pre>
+
+<p>The machine check runs over 500 training sentences per token task and asserts that the label array is exactly
+as long as the input ids and that the number of labelled positions equals the number of words, unless the sentence
+was genuinely truncated at the maximum length. The same script decodes SQuAD's character-level answer spans back
+out of the subword start/end indices it produced and compares them to the gold strings, which is the equivalent
+check for QA: the gold answer is a character offset in the context, and it has to survive being converted into
+token indices inside an overlapping window that may not even contain it.</p>
+
+<p><code>lhoestq/conll2003</code> ships its NER tags as plain integers with no label names attached, so the
+canonical CoNLL-2003 tag order is pinned in <code>src/data.py</code> and verified at load time against the shared
+task's own example sentence (<i>EU rejects German call to boycott British lamb .</i>, with <code>EU</code> =
+<code>B-ORG</code>). A silent change in that mapping would be indistinguishable from a bad model.</p>
+
+<h3>Hardware</h3>
+
+<p>Everything was trained locally on {{VAL_env}} — Apple silicon, not a datacentre GPU. Two consequences shaped
+the design. Mixed precision through <code>bfloat16</code> autocast roughly doubles throughput on this device and
+is enabled for every run. And MPS has no fused attention kernel that supports dropout, so the models are loaded
+with the eager attention implementation; on CUDA the same code keeps the fast path. Device selection is automatic
+(<code>src/common.get_device</code>), so the identical modules run on Colab or Kaggle through the notebook in
+<code>notebooks/</code>.</p>
+
+<h2>3. Hypotheses</h2>
+
+<p>We wrote these down before running the grid, from the structure of each task and from section 5.3 of the BERT
+paper, where feature-based adaptation on CoNLL NER comes within about 0.3 F1 of full fine-tuning when the
+features are a concatenation of the top four layers — a detail worth holding onto, because we use the last layer
+alone.</p>
+
+<table class="keep">
+<thead><tr><th style="width:11%">#</th><th style="width:37%">Hypothesis</th><th>Reasoning</th><th style="width:15%">Verdict</th></tr></thead>
+<tbody>
+<tr><td><b>H1</b> · Topic</td><td>Feature-based adaptation gets within a few points of fine-tuning.</td>
+  <td>Topic is a document-level, largely lexical decision; a pooled sentence vector should already separate
+  <i>Sports</i> from <i>Business</i> without reshaping the encoder.</td><td>{{VERDICT_H1}}</td></tr>
+<tr><td><b>H2</b> · NER</td><td>Fine-tuning is required; the frozen gap is large.</td>
+  <td>Entity boundaries are a contextual, structured decision, and the BIO scheme means a half-recovered span
+  scores zero. A linear read-out of the last layer has no way to reshape the representation for it.</td><td>{{VERDICT_H2}}</td></tr>
+<tr><td><b>H3</b> · POS</td><td>Frozen features are strong; partial fine-tuning closes most of what is left.</td>
+  <td>Probing work consistently finds part-of-speech information in the lower and middle layers of BERT. The
+  pretraining objective essentially has to encode it.</td><td>{{VERDICT_H3}}</td></tr>
+<tr><td><b>H4</b> · QA</td><td>Feature-based adaptation fails outright.</td>
+  <td>A span head has to make the question interrogate the context. That cross-attention behaviour is not in a
+  frozen masked-language-model representation; no linear layer on top can invent it.</td><td>{{VERDICT_H4}}</td></tr>
+<tr><td><b>H5</b> · Pooling</td><td>For frozen sequence classification, mean pooling beats <code>[CLS]</code>.</td>
+  <td><code>[CLS]</code> was pretrained for next-sentence prediction, not as a general sentence embedding; without
+  fine-tuning there is nothing that makes it a good summary.</td><td>{{VERDICT_H5}}</td></tr>
+</tbody></table>
+
+<h2>4. The adaptation ladder, concretely</h2>
+
+<p>The three rungs are implemented by one function, <code>src/common.apply_adaptation</code>, which decides which
+parameters carry gradients. Everything outside the encoder body is head and always trains.</p>
+
+<table class="keep">
+<thead><tr><th>Rung</th><th>What trains</th><th class="n">Trainable</th><th>How it is done here</th></tr></thead>
+<tbody>
+<tr><td>Feature-based</td><td>Only the consumer of the frozen representation</td><td class="n">0 BERT params</td>
+  <td>Two variants. <b>(a)</b> The last hidden states are extracted once, cached to disk, and consumed by a
+  scikit-learn estimator (logistic regression, linear SVM, random forest). <b>(b)</b> A linear or MLP probe
+  trained with PyTorch on top of the frozen body — identical in spirit, but the result is a normal
+  <code>transformers</code> checkpoint that can be published to the Hub.</td></tr>
+<tr><td>Partial fine-tuning</td><td>Head + top <i>N</i> encoder layers</td><td class="n">≈14 M (N=2), ≈28 M (N=4)</td>
+  <td>The body is frozen, then the top <i>N</i> layers are unfrozen again. The lower layers — which probing work
+  says carry the general lexical and syntactic machinery — are left exactly as pretraining left them.</td></tr>
+<tr><td>Full fine-tuning</td><td>Everything</td><td class="n">≈110 M</td>
+  <td>Every parameter carries a gradient, at the encoder learning rate.</td></tr>
+</tbody></table>
+
+<h3>Two learning rates, always</h3>
+
+<p>A freshly initialised head and a pretrained encoder want opposite step sizes: the head has no information and
+needs ≈1e-3 to learn anything in a few epochs, while encoder weights are the product of a long pretraining run and
+2e-5–3e-5 is already enough to damage them. Every run that trains head and body together therefore uses
+<b>two parameter groups</b> (<code>src/train.TwoGroupTrainer</code>), with a linear schedule and 10% warmup on
+both, and weight decay switched off for biases and LayerNorm — the standard exception, because shrinking a
+normalisation gain toward zero is not regularisation, it is damage. A single shared rate would have crippled every
+partial and full fine-tuning run, and a crippled run inside a comparison is worse than no run at all.</p>
+
+<p>The feature-based rung deserves one more note. When the body is frozen it is also <b>pinned in eval mode</b>,
+so its dropout never fires and it behaves as a deterministic feature extractor — otherwise the PyTorch probe and
+the scikit-learn estimator would be consuming different representations of the same sentence, and the comparison
+between them would mean nothing.</p>
+
+<h2>5. Metrics and evaluation</h2>
+
+<p>Each task is scored with the metric that penalises the mistakes that matter for it, plus a second metric that
+catches the specific way that task's models fail quietly.</p>
+
+<table class="keep">
+<thead><tr><th style="width:16%">Task</th><th style="width:22%">Primary metric</th><th>Why this one</th><th style="width:22%">Secondary</th></tr></thead>
+<tbody>
+<tr><td>Topic classification</td><td><b>Accuracy</b></td>
+  <td>AG News is exactly balanced (1 900 test items per class), so accuracy is not misleading here and is the
+  number the literature reports for this dataset.</td>
+  <td><b>Macro-F1</b> — identical to accuracy on a balanced set unless a class has collapsed, which is precisely
+  the failure it is there to expose. A per-class report and a confusion matrix are stored with every run.</td></tr>
+<tr><td>NER</td><td><b>Entity-level micro F1</b> (seqeval)</td>
+  <td>The unit of correctness is the whole span with its type: predicting <code>B-PER I-PER</code> as
+  <code>B-PER O</code> is a wrong answer, not a 50% correct one. This is the official CoNLL-2003 measure, so our
+  numbers sit on the same scale as the published ones.</td>
+  <td><b>Token accuracy</b>, kept deliberately: roughly 83% of CoNLL tokens are <code>O</code>, so a model that
+  predicts nothing at all scores in the eighties. The distance between the two numbers is the point.</td></tr>
+<tr><td>POS</td><td><b>Token accuracy</b></td>
+  <td>Every token gets exactly one tag, the tags are dense rather than sparse, and there is no span structure to
+  respect — so the per-token decision <i>is</i> the unit of correctness. It is also the standard UD measure.</td>
+  <td><b>Macro-F1 over the 17 UPOS tags</b>: accuracy is dominated by <code>NOUN</code>, <code>PUNCT</code>,
+  <code>VERB</code> and <code>DET</code>, and hides whether the rare tags (<code>INTJ</code>, <code>SYM</code>,
+  <code>X</code>) are learned at all. A full 17×17 confusion matrix is stored per run.</td></tr>
+<tr><td>Extractive QA</td><td><b>F1</b> (token overlap, SQuAD official normalisation)</td>
+  <td>Answers are free-form spans, and a prediction that returns <i>the 1929 stock market crash</i> for a gold
+  <i>1929</i> is largely right. F1 credits partial overlap; both are computed with the official normalisation
+  (lowercase, strip articles and punctuation) and take the maximum over the gold answers.</td>
+  <td><b>Exact match</b> — the strict complement. A large EM/F1 spread means the model finds the right region but
+  not the right boundaries, which is a different disease from finding the wrong region.</td></tr>
+</tbody></table>
+
+<p><b>Where the numbers come from.</b> Every score in this report is computed on a held-out test split that was
+never used for training or for choosing between methods: the official AG News, CoNLL-2003 and UD English-EWT test
+splits, and the SQuAD v1.1 development set. The per-epoch curves in section 7 use the development splits.</p>
+
+<p><b>Training diagnostics.</b> Every run records its full <code>Trainer</code> log history (training loss every
+50 steps, development metrics every epoch), wall-clock seconds per epoch and per step, total training time, test
+evaluation time, trainable and total parameter counts, and the resolved hyper-parameters — all serialised to
+<code>results/&lt;task&gt;/&lt;run_id&gt;.json</code>. The figures and tables in this report are generated from
+those files, so the prose cannot drift away from the numbers.</p>
+
+<h2>6. Results</h2>
+
+<p>The comparison the assignment asks for — tasks against methods, best run of each rung, primary metric:</p>
+
+{{TABLE_MATRIX}}
+
+<figure>
+  <img src="figures/ladder.png" alt="Every run, grouped by task, scored on its primary metric">
+  <figcaption>Figure 1 — every run in the grid, on its task's primary metric. Position, not bar length, encodes
+  the score, so the compressed ranges (POS spans 90–97) stay honest without a truncated axis.</figcaption>
+</figure>
+
+<figure>
+  <img src="figures/cost_benefit.png" alt="Primary metric against trainable parameters, log scale">
+  <figcaption>Figure 2 — what each rung costs and what it buys. The horizontal axis is trainable parameters on a
+  log scale; the grey line joins the best run of each rung. A flat line means fine-tuning is not worth paying for.</figcaption>
+</figure>
+
+{{SECTION_PER_TASK}}
+
+<h2>7. Training diagnostics</h2>
+
+<figure>
+  <img src="figures/curves.png" alt="Training loss per step and development metric per epoch">
+  <figcaption>Figure 3 — top: training loss against optimisation step. Bottom: the development metric after each
+  epoch. These are the curves used to decide that runs had converged and that no learning rate was misconfigured.</figcaption>
+</figure>
+
+{{PROSE_DIAGNOSTICS}}
+
+{{TABLE_TIMING}}
+
+<h2>8. Analysis and trade-offs</h2>
+
+{{PROSE_ANALYSIS}}
+
+<div class="callout warn">
+  <p style="margin:0"><b>On noise.</b> This is one run per configuration with a fixed seed, as the assignment
+  specifies. Identical code retrained with a different seed moves results by roughly ±1–3 points — head
+  initialisation, shuffling order and dropout all contribute — so any gap in this report smaller than that band is
+  noise, not a finding, and we mark it as such rather than re-running it. The gaps we draw conclusions from are
+  the large ones.</p>
+</div>
+
+<h2>9. Publishing</h2>
+
+<p>The four delivered models and their tokenizers are published to the HuggingFace Hub by
+<code>scripts/push_to_hub.py</code>, which generates each model card from the same
+<code>results/*.json</code> that produced this report. Every card states the training data and its licence, the
+adaptation method with its full hyper-parameters, the metrics on the held-out split, <b>the complete table of
+methods we tried for that task</b>, intended use, limitations and bias, and references. The cards are committed in
+<code>docs/model_cards/</code>.</p>
+
+{{TABLE_HUB}}
+
+<h2>10. Reproducibility</h2>
+
+<p>Seed 42 is fixed for Python, NumPy and PyTorch, and passed to <code>TrainingArguments</code> as both
+<code>seed</code> and <code>data_seed</code>, so head initialisation and shuffling repeat. The dataset subsamples
+(AG News 20 000 rows and its 5 000-row dev split, SQuAD 15 000 rows) come from seeded shuffles, so a replica sees
+the same rows and not merely the same number of rows. Dependencies are pinned in <code>requirements.txt</code> at
+the exact versions used. Reductions on GPU and MPS are not bit-exact, so the last decimal may move.</p>
+
+<pre>python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/sanity_check.py       # subword/label alignment, before any training
+.venv/bin/python scripts/run_experiments.py    # the whole grid, resumable
+.venv/bin/python scripts/make_figures.py       # figures from results/*.json
+.venv/bin/python scripts/build_report.py       # this report</pre>
+
+<p>The grid is resumable: a run whose result file already exists is skipped, so an interrupted session continues
+where it stopped. <code>--task</code>, <code>--limit</code> and <code>--force</code> narrow it while iterating,
+and <code>--limit 200</code> runs the entire pipeline end to end in a couple of minutes as a smoke test.</p>
+
+<h2>11. References</h2>
+
+<ul>
+<li>Devlin, J., Chang, M.-W., Lee, K. &amp; Toutanova, K. (2019). <i>BERT: Pre-training of Deep Bidirectional
+  Transformers for Language Understanding.</i> NAACL. <span class="mono">arXiv:1810.04805</span> — section 5.3 is
+  the feature-based versus fine-tuning comparison this assignment mirrors.</li>
+<li>Tunstall, L., von Werra, L. &amp; Wolf, T. <i>Natural Language Processing with Transformers.</i> O'Reilly,
+  chapters 1–3.</li>
+<li>HuggingFace. <i>Fine-tune a pretrained model</i>, and the token-classification and question-answering task
+  guides — the reference recipes for the <code>-100</code> convention and for SQuAD windowing and span
+  post-processing, which <code>src/encoding.py</code> and <code>src/qa_utils.py</code> follow.</li>
+<li>Zhang, X., Zhao, J. &amp; LeCun, Y. (2015). <i>Character-level Convolutional Networks for Text
+  Classification.</i> NeurIPS — the AG News corpus.</li>
+<li>Tjong Kim Sang, E. F. &amp; De Meulder, F. (2003). <i>Introduction to the CoNLL-2003 Shared Task:
+  Language-Independent Named Entity Recognition.</i> CoNLL.</li>
+<li>Silveira, N. et al. (2014). <i>A Gold Standard Dependency Corpus for English.</i> LREC — UD English-EWT,
+  CC BY-SA 4.0.</li>
+<li>Rajpurkar, P., Zhang, J., Lopyrev, K. &amp; Liang, P. (2016). <i>SQuAD: 100,000+ Questions for Machine
+  Comprehension of Text.</i> EMNLP.</li>
+<li>Nakayama, H. (2018). <i>seqeval: A Python framework for sequence labeling evaluation</i> — the entity-level
+  scorer used for NER.</li>
+<li>Tenney, I., Das, D. &amp; Pavlick, E. (2019). <i>BERT Rediscovers the Classical NLP Pipeline.</i> ACL — the
+  layer-wise probing result behind hypothesis H3.</li>
+</ul>
+
+</body>
+</html>

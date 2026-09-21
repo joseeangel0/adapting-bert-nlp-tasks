@@ -137,6 +137,35 @@ def table_qa_examples() -> str:
             f'<th>Predicted span</th></tr></thead><tbody>{body}</tbody></table>')
 
 
+def table_hub() -> str:
+    """The four Hub repositories, with the account namespace if one is configured yet."""
+    cfg = json.loads((ROOT / "configs" / "report.json").read_text())
+    user = cfg.get("hf_user") or ""
+    slug = {"agnews": "bert-base-uncased-agnews-topic", "ner": "bert-base-uncased-conll2003-ner",
+            "pos": "bert-base-uncased-ud-ewt-pos", "qa": "bert-base-uncased-squad-qa"}
+    pipeline = {"agnews": "text-classification", "ner": "token-classification",
+                "pos": "token-classification", "qa": "question-answering"}
+    best = best_per_task()
+    head = ("<tr><th>Task</th><th>Repository</th><th><code>pipeline_tag</code></th>"
+            "<th class='n'>Reported metric</th></tr>")
+    body = []
+    for t in TASK_ORDER:
+        r = best.get(t)
+        if not r:
+            continue
+        repo = f"{user}/{slug[t]}" if user else slug[t]
+        cell = (f'<a href="https://huggingface.co/{repo}">{repo}</a>' if user
+                else f"<code>{repo}</code>")
+        body.append(f"<tr><td>{TASK_TITLES[t].split(' (')[0]}</td><td>{cell}</td>"
+                    f"<td><code>{pipeline[t]}</code></td>"
+                    f"<td class='n'>{HEADLINE[t][1]} {fmt(r['headline'])}</td></tr>")
+    note = "" if user else ('<p class="small">The repository names above are the slugs created by '
+                            '<code>scripts/push_to_hub.py --user &lt;account&gt;</code>; the account '
+                            'namespace is filled in from <code>configs/report.json</code> when the '
+                            'models are pushed.</p>')
+    return f'<table class="keep"><thead>{head}</thead><tbody>{"".join(body)}</tbody></table>{note}'
+
+
 def values() -> dict[str, str]:
     """Scalars the prose interpolates, so sentences never contradict the tables."""
     out: dict[str, str] = {}
@@ -160,6 +189,9 @@ def values() -> dict[str, str]:
         if "VAL_%s_frozen" % task in out and "VAL_%s_full" % task in out:
             gap = float(out[f"VAL_{task}_full"]) - float(out[f"VAL_{task}_frozen"])
             out[f"VAL_{task}_gap"] = f"{gap:+.1f}"
+    cfg = json.loads((ROOT / "configs" / "report.json").read_text())
+    out["TEAM"] = " &middot; ".join(n.replace(" ", "&nbsp;") for n in cfg["team"])
+    out["REPO_URL"] = cfg.get("repo_url") or "local repository (not published)"
     env = data[0]["raw"]["env"]
     out["VAL_env"] = f"{env.get('chip', 'CPU')} - torch {env['torch']} on {env['device']}"
     out["VAL_total_runs"] = str(len(data))
@@ -175,6 +207,7 @@ def render() -> str:
         "{{TABLE_DATASETS}}": table_datasets(),
         "{{TABLE_TIMING}}": table_timing(),
         "{{TABLE_QA_EXAMPLES}}": table_qa_examples(),
+        "{{TABLE_HUB}}": table_hub(),
     }
     for task in TASK_ORDER:
         repl[f"{{{{TABLE_RUNS_{task}}}}}"] = table_runs(task)

@@ -107,4 +107,4 @@ start/end: 90/90  ->  subwords ['books']
 decoded  : 'books'
 gold     : 'books'
 
-spans recovered: 1/2
+spans recovered: 2/2

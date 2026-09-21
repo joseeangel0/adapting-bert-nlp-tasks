@@ -8,7 +8,7 @@ crawls for the head or destroys what pretraining built.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import torch
@@ -73,20 +73,21 @@ class TwoGroupTrainer(Trainer):
 
 
 class QATrainer(TwoGroupTrainer):
-    """Adds span post-processing so EM/F1 are logged every epoch, not just at the end."""
-    eval_examples = None
-    eval_features = None
-    post_fn: Callable | None = None
+    """Span post-processing happens inside compute_metrics, so each evaluation is one pass.
 
-    def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval"):
-        out = super().evaluate(eval_dataset=eval_dataset, ignore_keys=ignore_keys,
-                               metric_key_prefix=metric_key_prefix)
-        if self.eval_examples is None:
-            return out
-        extra = self.post_fn(self)
-        out.update({f"{metric_key_prefix}_{k}": v for k, v in extra.items()})
-        self.log(out)
-        return out
+    The validation features carry no start/end positions - there is no loss to compute on
+    them - so a separate scoring pass would be pure waste. `pack` is swapped between the
+    development and test sets before each evaluation; predictions come back in feature
+    order, which is the order postprocess_qa expects.
+    """
+    pack: tuple | None = None          # (examples, features_with_offsets)
+    last_predictions: dict[str, str] | None = None
+
+    def score(self, eval_pred):
+        examples, feats = self.pack
+        self.last_predictions = qa_utils.postprocess_qa(examples, feats, eval_pred.predictions)
+        m = squad_metrics(self.last_predictions, examples)
+        return {"exact_match": m["exact_match"], "f1": m["f1"]}
 
 
 # --------------------------------------------------------------------------- #
@@ -198,14 +199,8 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
     trainer.head_lr, trainer.body_lr = head_lr, body_lr
 
     if td.kind == "qa":
-        def post_fn(tr, pack=packs["dev"]):
-            examples, feats, model_in = pack
-            raw = tr.predict(model_in, metric_key_prefix="tmp").predictions
-            preds = qa_utils.postprocess_qa(examples, feats, raw)
-            m = squad_metrics(preds, examples)
-            return {"exact_match": m["exact_match"], "f1": m["f1"]}
-        trainer.eval_examples, trainer.eval_features = packs["dev"][0], packs["dev"][1]
-        trainer.post_fn = post_fn
+        trainer.pack = packs["dev"][:2]
+        trainer.compute_metrics = trainer.score
 
     with Stopwatch() as sw_train:
         trainer.train()
@@ -214,8 +209,9 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
     with Stopwatch() as sw_eval:
         if td.kind == "qa":
             examples, feats, model_in = packs["test"]
-            raw = trainer.predict(model_in, metric_key_prefix="test").predictions
-            preds = qa_utils.postprocess_qa(examples, feats, raw)
+            trainer.pack = (examples, feats)
+            trainer.predict(model_in, metric_key_prefix="test")
+            preds = trainer.last_predictions
             metrics = squad_metrics(preds, examples)
             metrics["sample_predictions"] = [
                 {"question": examples[i]["question"], "gold": examples[i]["answers"]["text"][0],

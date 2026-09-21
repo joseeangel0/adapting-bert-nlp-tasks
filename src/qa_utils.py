@@ -20,17 +20,9 @@ N_BEST = 20
 MAX_ANSWER_LEN = 30
 
 
-def prepare_train_features(examples, tokenizer, max_length: int = MAX_LEN,
-                           stride: int = DOC_STRIDE) -> dict[str, Any]:
-    questions = [q.lstrip() for q in examples["question"]]
-    enc = tokenizer(questions, examples["context"], truncation="only_second",
-                    max_length=max_length, stride=stride,
-                    return_overflowing_tokens=True, return_offsets_mapping=True,
-                    padding=False)
-    sample_map = enc.pop("overflow_to_sample_mapping")
-    offsets_all = enc.pop("offset_mapping")
+def _span_targets(enc, offsets_all, sample_map, examples, tokenizer) -> tuple[list, list]:
+    """Character answer span -> subword (start, end) per window; [CLS] when the window misses it."""
     starts, ends = [], []
-
     for i, offsets in enumerate(offsets_all):
         input_ids = enc["input_ids"][i]
         cls_index = input_ids.index(tokenizer.cls_token_id)
@@ -51,7 +43,7 @@ def prepare_train_features(examples, tokenizer, max_length: int = MAX_LEN,
             tok_end -= 1
 
         if not (offsets[tok_start][0] <= start_char and offsets[tok_end][1] >= end_char):
-            starts.append(cls_index); ends.append(cls_index)          # answer not in this window
+            starts.append(cls_index); ends.append(cls_index)      # answer not in this window
         else:
             while tok_start < len(offsets) and offsets[tok_start][0] <= start_char:
                 tok_start += 1
@@ -59,25 +51,44 @@ def prepare_train_features(examples, tokenizer, max_length: int = MAX_LEN,
             while offsets[tok_end][1] >= end_char:
                 tok_end -= 1
             ends.append(tok_end + 1)
-
-    enc["start_positions"] = starts
-    enc["end_positions"] = ends
-    return enc
+    return starts, ends
 
 
-def prepare_validation_features(examples, tokenizer, max_length: int = MAX_LEN,
-                                stride: int = DOC_STRIDE) -> dict[str, Any]:
+def _encode(examples, tokenizer, max_length: int, stride: int):
     questions = [q.lstrip() for q in examples["question"]]
     enc = tokenizer(questions, examples["context"], truncation="only_second",
                     max_length=max_length, stride=stride,
                     return_overflowing_tokens=True, return_offsets_mapping=True,
                     padding=False)
-    sample_map = enc.pop("overflow_to_sample_mapping")
+    return enc, enc.pop("overflow_to_sample_mapping")
+
+
+def prepare_train_features(examples, tokenizer, max_length: int = MAX_LEN,
+                           stride: int = DOC_STRIDE) -> dict[str, Any]:
+    enc, sample_map = _encode(examples, tokenizer, max_length, stride)
+    offsets_all = enc.pop("offset_mapping")
+    enc["start_positions"], enc["end_positions"] = _span_targets(
+        enc, offsets_all, sample_map, examples, tokenizer)
+    return enc
+
+
+def prepare_validation_features(examples, tokenizer, max_length: int = MAX_LEN,
+                                stride: int = DOC_STRIDE) -> dict[str, Any]:
+    """Evaluation windows: gold positions *and* the offsets needed to decode a span back.
+
+    The gold positions are kept so the evaluation pass also yields a loss and so
+    Trainer calls compute_metrics - which is where the spans are decoded, in a single
+    forward pass over the split rather than two.
+    """
+    enc, sample_map = _encode(examples, tokenizer, max_length, stride)
+    offsets_all = enc["offset_mapping"]
+    enc["start_positions"], enc["end_positions"] = _span_targets(
+        enc, offsets_all, sample_map, examples, tokenizer)
     enc["example_id"] = [examples["id"][sample_map[i]] for i in range(len(enc["input_ids"]))]
-    # Keep only context offsets; question offsets must never be picked as an answer.
+    # Keep only context offsets; a span must never be decoded out of the question.
     enc["offset_mapping"] = [
         [off if enc.sequence_ids(i)[k] == 1 else None for k, off in enumerate(offsets)]
-        for i, offsets in enumerate(enc["offset_mapping"])
+        for i, offsets in enumerate(offsets_all)
     ]
     return enc
 
