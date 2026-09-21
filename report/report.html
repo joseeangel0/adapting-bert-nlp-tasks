@@ -430,6 +430,14 @@ champion Carolina Panthers</i> — the answer is in there, with the boundary in 
 different disease from looking in the wrong place, and it is the one a model trained on 15 000 examples has.
 More data tightens boundaries; it is not what separates this model from the frozen one.</p>
 
+<p><b>Why there is no full fine-tuning row for SQuAD.</b> It was attempted and did not complete. The local run
+was the heaviest in the grid — sequence length 384 with every parameter trainable — and a machine sleep during
+it pushed the process into swap, slowing it by two orders of magnitude; it was stopped rather than left to
+finish in days. Two further attempts on a GPU notebook failed on arguments that transformers 5 removed from
+<code>TrainingArguments</code>, which the code now tolerates. We did not re-run it a fourth time. The two
+methods that did complete satisfy the assignment's requirement of at least two per task, full fine-tuning is
+measured on the other three, and the table shows a dash rather than an estimate.</p>
+
 <p><b>Delivered: Partial FT (top 4 layers), at 72.91 F1 and 60.68 exact match</b>,
 from 28.4 M trainable parameters. Two caveats stated plainly. First, this is below published SQuAD numbers for
 <code>bert-base</code> (around 88 F1), which is expected: we train on the 15 000-example subsample the
@@ -538,6 +546,9 @@ a way accuracy alone would have hidden. There is no single answer, which is the 
 <li><b>SQuAD is trained on 15 000 of 87 599 examples</b>, so its absolute numbers sit well below published
   <code>bert-base</code> results. The comparison between methods is internally valid; the absolute figure is
   not comparable to the literature.</li>
+<li><b>SQuAD has no full fine-tuning run</b> (see 6.4). On the other three tasks full fine-tuning beat partial by
+  0.7–1.9 points, so the delivered QA model is very likely not the best one this body can produce. It is the
+  best one we measured.</li>
 <li><b>"Frozen" turned out to be ambiguous</b>, and expensively so. Whether BERT's pooler counts as body or as
   head moved AG News by 7.5 points — more than the entire distance from feature-based to
   full fine-tuning on that task. Any comparison of adaptation methods should say where it draws that line.</li>
