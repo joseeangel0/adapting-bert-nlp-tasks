@@ -213,8 +213,11 @@ def run(task: str, method: str, model_name: str = "bert-base-uncased", *,
             return {"token_accuracy": m["token_accuracy"], "macro_f1": m["macro_f1"]}
 
     out_dir = MODELS / task / run_id
+    # `overwrite_output_dir` was removed in transformers 5 and is unnecessary here anyway:
+    # save_strategy is "no" and nothing is ever resumed from the output directory. Leaving it
+    # in made the grid crash on any machine with a newer transformers than the pinned one.
     args = TrainingArguments(
-        output_dir=str(out_dir), overwrite_output_dir=True,
+        output_dir=str(out_dir),
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size, per_device_eval_batch_size=eval_batch_size,
         gradient_accumulation_steps=grad_accum,
