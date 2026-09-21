@@ -14,7 +14,7 @@ metrics:
   - accuracy
   - macro_f1
 model-index:
-  - name: EXAMPLE/bert-base-uncased-agnews-topic
+  - name: joseeangel/bert-base-uncased-agnews-topic
     results:
     - task:
         type: text-classification
@@ -31,7 +31,7 @@ model-index:
         name: Macro F1
 ---
 
-# EXAMPLE/bert-base-uncased-agnews-topic
+# joseeangel/bert-base-uncased-agnews-topic
 
 `bert-base-uncased` adapted to **Topic classification (AG News)** with **Full fine-tuning**.
 
@@ -86,6 +86,7 @@ Held-out test split, never seen during training or model selection.
 | Method | Trainable params | Share of model | Accuracy | Macro F1 | Train time (min) |
 |---|---:|---:|---:|---:|---:|
 | Feature-based (logistic regression, mean-pooled) | 3,076 | 0.0% | 90.18 | 90.18 | 2.9 |
+| Feature-based (linear probe, pooler as head) | 593,668 | 0.542% | 89.61 | 89.59 | 13.6 |
 | Feature-based (linear SVM) | 3,076 | 0.0% | 89.21 | 89.20 | 0.1 |
 | Feature-based (logistic regression) | 3,076 | 0.0% | 88.61 | 88.59 | 2.0 |
 | Feature-based (random forest) | 0 | 0.0% | 84.87 | 84.79 | 0.3 |
@@ -109,7 +110,7 @@ numbers by roughly +/- 1-3 points, so gaps smaller than that are noise rather th
 ```python
 from transformers import pipeline
 
-pipe = pipeline("text-classification", model="EXAMPLE/bert-base-uncased-agnews-topic")
+pipe = pipeline("text-classification", model="joseeangel/bert-base-uncased-agnews-topic")
 ```
 
 ## Limitations and bias
