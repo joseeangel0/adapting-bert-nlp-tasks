@@ -1,0 +1,101 @@
+# Adapting BERT for NLP tasks (U2T01)
+
+One pretrained `bert-base-uncased` body, four classical NLP tasks, three rungs of the
+adaptation ladder — and the delivered model for each task chosen by **measurement**, not
+by default.
+
+| Rung | What trains | Trainable parameters |
+|---|---|---|
+| Feature-based | nothing in BERT; its last hidden states are features for a separate learner | 0 BERT + learner |
+| Partial fine-tuning | head + top *N* encoder layers | ≈14 M with top 2 layers |
+| Full fine-tuning | everything | ≈110 M |
+
+Every task is trained with at least two adaptation methods, on the same data, with the same
+seed, and the loser is reported next to the winner. The full analysis is in
+**`report/U2T01_report.pdf`**; the requirement-by-requirement record is in
+**`docs/VERIFICATION.md`**.
+
+## Tasks and data
+
+| Task | Dataset | Head | Metric |
+|---|---|---|---|
+| Topic classification | `fancyzhx/ag_news` (4 classes) | sequence classification | accuracy / macro-F1 |
+| Named entity recognition | `lhoestq/conll2003` | token classification (BIO) | entity-level F1 (seqeval) |
+| Part-of-speech tagging | `universal-dependencies/universal_dependencies`, `en_ewt` (17 UPOS tags) | token classification | token accuracy / macro-F1 |
+| Extractive QA | `rajpurkar/squad` (v1.1, 15 000-example subsample) | span start/end | exact match / F1 |
+
+## Reproduce it
+
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+.venv/bin/python scripts/sanity_check.py         # 1. subword/label alignment, before any training
+.venv/bin/python scripts/run_experiments.py      # 2. the whole grid (resumable; ~4 h on an Apple M5)
+.venv/bin/python scripts/make_figures.py         # 3. figures from results/*.json
+.venv/bin/python scripts/build_report.py         # 4. report.html + U2T01_report.pdf
+```
+
+The grid is **resumable**: a run whose `results/<task>/<run_id>.json` already exists is
+skipped, so the sequence above can be interrupted and restarted. Narrow it while iterating:
+
+```bash
+.venv/bin/python scripts/run_experiments.py --task ner pos     # only these tasks
+.venv/bin/python scripts/run_experiments.py --limit 200        # smoke test, a minute per run
+.venv/bin/python scripts/run_experiments.py --optional         # DistilBERT size benchmark
+.venv/bin/python scripts/run_experiments.py --force            # recompute existing runs
+```
+
+No GPU is required: the code picks MPS on Apple silicon, CUDA on Colab/Kaggle, and CPU
+otherwise. `notebooks/U2T01_colab.ipynb` runs the same modules on a Colab T4.
+
+### Determinism
+
+Seed `42` is fixed for Python, NumPy and PyTorch, and is also passed to `TrainingArguments`
+(`seed` and `data_seed`), so shuffling and head initialisation repeat. Dataset subsampling
+(AG News 20 000 rows, SQuAD 15 000 rows) uses the same seed, so the teacher's replica sees the
+same rows. Reductions on GPU/MPS are not bit-exact, so expect the last decimal to move.
+Per the assignment, one run per configuration: a re-seeded rerun moves results ±1–3 points,
+so gaps below that are noise, not findings.
+
+## Layout
+
+```
+configs/experiments.py     the grid: every run and its hyper-parameters
+configs/delivery.json      which run is published per task (defaults to the best)
+src/common.py              seeding, device, the freeze/unfreeze ladder, parameter groups, timing
+src/data.py                dataset loading and fixed-seed subsampling
+src/encoding.py            subword/label alignment (-100 convention) and its checks
+src/qa_utils.py            SQuAD windowing, span targets and span post-processing
+src/train.py               frozen probe / partial / full fine-tuning, two-LR optimiser
+src/feature_based.py       frozen features cached to disk + scikit-learn consumers
+src/metrics.py             per-task metrics (seqeval, SQuAD EM/F1, macro-F1, confusions)
+src/report_data.py         results/*.json -> the rows the figures and the report use
+scripts/                   sanity_check, run_experiments, make_figures, build_report, push_to_hub
+results/<task>/<run>.json  one file per run: metrics, hyper-parameters, loss curve, timings
+docs/sanity_check.txt      tokens printed next to their labels, per the assignment
+docs/model_cards/          the model card pushed with each published model
+```
+
+## Publishing
+
+```bash
+.venv/bin/python scripts/push_to_hub.py --user <hf-username> --dry-run   # write cards only
+hf auth login                                                            # or export HF_TOKEN
+.venv/bin/python scripts/push_to_hub.py --user <hf-username>
+```
+
+Each repository carries the model card in `docs/model_cards/`: training data and licence,
+the adaptation method and its hyper-parameters, the metrics, the full method comparison for
+that task, intended use, limitations and references.
+
+## References
+
+- Devlin, Chang, Lee & Toutanova (2019). *BERT: Pre-training of Deep Bidirectional Transformers
+  for Language Understanding.* [arXiv:1810.04805](https://arxiv.org/abs/1810.04805) — §5.3 is the
+  feature-based vs fine-tuning comparison this assignment mirrors.
+- Tunstall, von Werra & Wolf. *Natural Language Processing with Transformers*, O'Reilly, ch. 1–3.
+- HuggingFace, [fine-tune a pretrained model](https://huggingface.co/docs/transformers/training)
+  and the [token classification](https://huggingface.co/docs/transformers/tasks/token_classification)
+  and [question answering](https://huggingface.co/docs/transformers/tasks/question_answering) guides.
+- Tjong Kim Sang & De Meulder (2003), CoNLL-2003 shared task. Zhang, Zhao & LeCun (2015), AG News.
+  Rajpurkar et al. (2016), SQuAD. Silveira et al. (2014) / Universal Dependencies, UD English-EWT.

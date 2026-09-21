@@ -1,0 +1,110 @@
+=== ner: subword/label alignment (bert-base-uncased) ===
+
+-- example 0 (9 words -> 11 subwords) --
+subword          word_id   label  tag
+[CLS]               None    -100  (ignored)
+eu                     0       3  B-ORG
+rejects                1       0  O
+german                 2       7  B-MISC
+call                   3       0  O
+to                     4       0  O
+boycott                5       0  O
+british                6       7  B-MISC
+lamb                   7       0  O
+.                      8       0  O
+[SEP]               None    -100  (ignored)
+words=9  labelled positions=9  OK
+
+-- example 1 (2 words -> 4 subwords) --
+subword          word_id   label  tag
+[CLS]               None    -100  (ignored)
+peter                  0       1  B-PER
+blackburn              1       2  I-PER
+[SEP]               None    -100  (ignored)
+words=2  labelled positions=2  OK
+
+invariant check: {"checked": 500, "length_mismatches": 0, "truncated_sentences": 0, "unexplained_label_loss": 0, "passed": true}
+
+=== pos: subword/label alignment (bert-base-uncased) ===
+
+-- example 0 (29 words -> 36 subwords) --
+subword          word_id   label  tag
+[CLS]               None    -100  (ignored)
+al                     0      11  PROPN
+-                      1      12  PUNCT
+za                     2      11  PROPN
+##man                  2    -100  (ignored)
+:                      3      12  PUNCT
+american               4       0  ADJ
+forces                 5       7  NOUN
+killed                 6      15  VERB
+sha                    7      11  PROPN
+##ikh                  7    -100  (ignored)
+abdullah               8      11  PROPN
+al                     9      11  PROPN
+-                     10      12  PUNCT
+an                    11      11  PROPN
+##i                   11    -100  (ignored)
+,                     12      12  PUNCT
+the                   13       5  DET
+preacher              14       7  NOUN
+at                    15       1  ADP
+the                   16       5  DET
+mosque                17       7  NOUN
+in                    18       1  ADP
+the                   19       5  DET
+town                  20       7  NOUN
+of                    21       1  ADP
+q                     22      11  PROPN
+##ai                  22    -100  (ignored)
+##m                   22    -100  (ignored)
+,                     23      12  PUNCT
+near                  24       1  ADP
+the                   25       5  DET
+syrian                26       0  ADJ
+border                27       7  NOUN
+.                     28      12  PUNCT
+[SEP]               None    -100  (ignored)
+words=29  labelled positions=29  OK
+
+-- example 1 (18 words -> 20 subwords) --
+subword          word_id   label  tag
+[CLS]               None    -100  (ignored)
+[                      0      12  PUNCT
+this                   1       5  DET
+killing                2       7  NOUN
+of                     3       1  ADP
+a                      4       5  DET
+respected              5       0  ADJ
+cleric                 6       7  NOUN
+will                   7       3  AUX
+be                     8       3  AUX
+causing                9      15  VERB
+us                    10      10  PRON
+trouble               11       7  NOUN
+for                   12       1  ADP
+years                 13       7  NOUN
+to                    14       9  PART
+come                  15      15  VERB
+.                     16      12  PUNCT
+]                     17      12  PUNCT
+[SEP]               None    -100  (ignored)
+words=18  labelled positions=18  OK
+
+invariant check: {"checked": 500, "length_mismatches": 0, "truncated_sentences": 0, "unexplained_label_loss": 0, "passed": true}
+
+=== qa: answer span -> subword start/end ===
+
+-- feature 0 (window of 140 subwords) --
+question : what percentage of egyptians polled support death penalty for those leaving islam?
+start/end: 97/98  ->  subwords ['84', '%']
+decoded  : '84 %'
+gold     : '84%'
+
+-- feature 1 (window of 127 subwords) --
+question : ann arbor ranks 1st among what goods sold?
+start/end: 90/90  ->  subwords ['books']
+decoded  : 'books'
+gold     : 'books'
+
+spans recovered: 1/2

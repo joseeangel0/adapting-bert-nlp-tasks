@@ -1,0 +1,18 @@
+# Pinned to the exact versions every number in the report was produced with.
+# The code picks its device automatically: MPS on Apple silicon, CUDA on Colab/Kaggle, else CPU.
+# python 3.12
+
+accelerate==1.15.0
+datasets==5.0.1
+evaluate==0.4.6
+huggingface_hub==0.36.2
+matplotlib==3.11.2
+numpy==2.2.6
+pandas==3.0.6
+safetensors==0.8.0
+scikit-learn==1.9.1
+seqeval==1.2.2
+tokenizers==0.22.2
+torch==2.14.0
+tqdm==4.70.1
+transformers==4.57.6

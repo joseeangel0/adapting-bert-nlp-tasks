@@ -1,0 +1,137 @@
+{
+  "task": "agnews",
+  "run_id": "frozen_sk-logreg_mean_bert-base-uncased",
+  "method": "frozen",
+  "model_name": "bert-base-uncased",
+  "head": "sklearn:logreg",
+  "hyperparams": {
+    "estimator": "logreg",
+    "pooling": "mean",
+    "params": {
+      "C": 1.0,
+      "class_weight": null,
+      "dual": false,
+      "fit_intercept": true,
+      "intercept_scaling": 1,
+      "l1_ratio": 0.0,
+      "max_iter": 1000,
+      "n_jobs": -1,
+      "penalty": "deprecated",
+      "random_state": 42,
+      "solver": "lbfgs",
+      "tol": 0.0001,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "max_length": 128
+  },
+  "params": {
+    "total_params": 109482240,
+    "trainable_params": 0,
+    "trainable_pct": 0.0,
+    "learner_params": 3076,
+    "note": "0 BERT parameters updated; the learner sits on top of frozen features"
+  },
+  "metrics": {
+    "accuracy": 0.90184,
+    "macro_f1": 0.90177,
+    "weighted_f1": 0.90177,
+    "per_class": {
+      "World": {
+        "precision": 0.9184,
+        "recall": 0.8947,
+        "f1-score": 0.9064,
+        "support": 1900.0
+      },
+      "Sports": {
+        "precision": 0.9622,
+        "recall": 0.9774,
+        "f1-score": 0.9697,
+        "support": 1900.0
+      },
+      "Business": {
+        "precision": 0.8556,
+        "recall": 0.8605,
+        "f1-score": 0.858,
+        "support": 1900.0
+      },
+      "Sci/Tech": {
+        "precision": 0.8711,
+        "recall": 0.8747,
+        "f1-score": 0.8729,
+        "support": 1900.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        1700,
+        47,
+        94,
+        59
+      ],
+      [
+        25,
+        1857,
+        14,
+        4
+      ],
+      [
+        71,
+        11,
+        1635,
+        183
+      ],
+      [
+        55,
+        15,
+        168,
+        1662
+      ]
+    ],
+    "n_examples": 7600
+  },
+  "train_log": [],
+  "epoch_times": [
+    {
+      "stage": "feature extraction",
+      "seconds": 173.16
+    },
+    {
+      "stage": "estimator fit",
+      "seconds": 1.73
+    },
+    {
+      "stage": "predict test",
+      "seconds": 0.0
+    }
+  ],
+  "train_seconds": 1.73,
+  "eval_seconds": 0.0,
+  "dataset": {
+    "source": "fancyzhx/ag_news",
+    "license": "Custom (AG News corpus, academic use)",
+    "citation": "Zhang, Zhao & LeCun (2015), Character-level Convolutional Networks for Text Classification",
+    "sizes": {
+      "train": 20000,
+      "dev": 5000,
+      "test": 7600
+    },
+    "num_labels": 4,
+    "labels": [
+      "World",
+      "Sports",
+      "Business",
+      "Sci/Tech"
+    ]
+  },
+  "env": {
+    "python": "3.12.13",
+    "torch": "2.14.0",
+    "device": "mps",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "chip": "Apple M5"
+  },
+  "seed": 42,
+  "notes": ""
+}
