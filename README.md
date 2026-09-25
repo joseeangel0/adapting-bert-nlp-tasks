@@ -4,6 +4,8 @@ One pretrained `bert-base-uncased` body, four classical NLP tasks, three rungs o
 adaptation ladder — and the delivered model for each task chosen by **measurement**, not
 by default.
 
+Recomendation: Execute the notebooks in Google Collab or Kaggle Notebooks
+
 | Rung | What trains | Trainable parameters |
 |---|---|---|
 | Feature-based | nothing in BERT; its last hidden states are features for a separate learner | 0 BERT + learner |
