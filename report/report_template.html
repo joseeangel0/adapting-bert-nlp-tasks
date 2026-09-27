@@ -44,7 +44,6 @@
 </style>
 </head>
 <body>
-<body>
 
 <section class="cover">
   <div class="kicker">Trends in Data Science · Unit 2 · Task 01</div>
@@ -57,7 +56,7 @@
   <b>Repository:</b> {{REPO_URL}}</p>
   <p class="small" style="margin-top:6pt">Deliverables: this report, the code that produced every number in it
     (<code>scripts/run_experiments.py</code> reruns the whole grid), and four published models with model cards.
-    Environment: {{VAL_env}} · {{VAL_total_runs}} runs · {{VAL_total_minutes}} minutes of training.</p>
+    Environment: {{VAL_envs}} · {{VAL_total_runs}} runs · {{VAL_total_minutes}} minutes of training.</p>
 </section>
 
 <ol class="toc">
@@ -143,12 +142,18 @@ task's own example sentence (<i>EU rejects German call to boycott British lamb .
 
 <h3>Hardware</h3>
 
-<p>Everything was trained locally on {{VAL_env}} — Apple silicon, not a datacentre GPU. Two consequences shaped
-the design. Mixed precision through <code>bfloat16</code> autocast roughly doubles throughput on this device and
-is enabled for every run. And MPS has no fused attention kernel that supports dropout, so the models are loaded
-with the eager attention implementation; on CUDA the same code keeps the fast path. Device selection is automatic
-(<code>src/common.get_device</code>), so the identical modules run on Colab or Kaggle through the notebook in
-<code>notebooks/</code>.</p>
+<p>{{VAL_env_main_runs}} of the {{VAL_total_runs}} runs were trained locally on {{VAL_env}} — Apple silicon, not a
+datacentre GPU. Two consequences shaped the design. Mixed precision through <code>bfloat16</code> autocast roughly
+doubles throughput on this device and is enabled for every local run. And MPS has no fused attention kernel that
+supports dropout, so the models are loaded with the eager attention implementation; on CUDA the same code keeps the
+fast path. Device selection is automatic (<code>src/common.get_device</code>), so the identical modules run on Colab
+or Kaggle through the notebooks in <code>notebooks/</code>.</p>
+
+<p>The remaining run, full fine-tuning on SQuAD, was trained on {{VAL_env_other}} through
+<code>notebooks/U2T01_colab.ipynb</code> (section 6.4 explains why). The T4 has no <code>bfloat16</code>, so the
+same code switches to <code>float16</code> there. Its score is comparable with the rest; its wall-clock time is not,
+and every table that shows a time marks it with †. The same notebook re-ran the other twenty runs on the T4 as a
+cross-hardware replica: none moved by more than 0.3 points (<code>docs/replica_t4.md</code>).</p>
 
 <h2>3. Hypotheses</h2>
 
@@ -171,7 +176,7 @@ alone.</p>
   pretraining objective essentially has to encode it.</td><td><b>Half right</b><br><span class="small">Frozen features are strong as predicted ({{VAL_pos_frozen}}%), but partial fine-tuning closed only half the accuracy gap and almost none of the macro-F1 gap. See 6.3.</span></td></tr>
 <tr><td><b>H4</b> · QA</td><td>Feature-based adaptation fails outright.</td>
   <td>A span head has to make the question interrogate the context. That cross-attention behaviour is not in a
-  frozen masked-language-model representation; no linear layer on top can invent it.</td><td><span class="pass">Holds</span><br><span class="small">{{VAL_qa_frozen}} vs {{VAL_qa_partial}} F1: {{VAL_qa_gap}} points, the widest gap in the assignment. See 6.4 for what the frozen model actually answers.</span></td></tr>
+  frozen masked-language-model representation; no linear layer on top can invent it.</td><td><span class="pass">Holds</span><br><span class="small">{{VAL_qa_frozen}} vs {{VAL_qa_full}} F1: {{VAL_qa_gap}} points, the widest gap in the assignment. See 6.4 for what the frozen model actually answers.</span></td></tr>
 <tr><td><b>H5</b> · Pooling</td><td>For frozen sequence classification, mean pooling beats <code>[CLS]</code>.</td>
   <td><code>[CLS]</code> was pretrained for next-sentence prediction, not as a general sentence embedding; without
   fine-tuning there is nothing that makes it a good summary.</td><td><span class="pass">Holds</span><br><span class="small">Mean pooling {{VAL_agnews_frozen}} vs {{VAL_agnews_sk_cls}} for <code>[CLS]</code>, same classifier. The pooler result in 6.1 is the same effect, larger.</span></td></tr>
@@ -405,13 +410,14 @@ they do, the 110 M-parameter model is worth its cost here.</p>
 {{TABLE_RUNS_qa}}
 
 <p><b>H4 holds, and by the widest margin in the assignment.</b> A span head on a frozen body reaches
-{{VAL_qa_frozen}} F1; unfreezing the top four encoder layers reaches {{VAL_qa_partial}}. That is
-{{VAL_qa_gap}} points — an order of magnitude larger than the gap on part-of-speech tagging, on the same body,
-with the same head learning rate, in the same framework. Whatever "feature-based adaptation" means, it does not
-mean the same thing from one task to the next.</p>
+{{VAL_qa_frozen}} F1; unfreezing the top four encoder layers reaches {{VAL_qa_partial}}, and unfreezing everything
+{{VAL_qa_full}}. The full distance, {{VAL_qa_gap}} points, is an order of magnitude larger than the gap on
+part-of-speech tagging, on the same body, with the same head learning rate, in the same framework. Whatever
+"feature-based adaptation" means, it does not mean the same thing from one task to the next.</p>
 
 <p>The reason is visible in the predictions rather than in the score. A frozen BERT plus a linear span head
-produces answers of the right <i>kind</i> and the wrong <i>identity</i>:</p>
+produces answers of the right <i>kind</i> and the wrong <i>identity</i>; the delivered model, on the same five
+questions, is in the last column:</p>
 
 {{TABLE_QA_EXAMPLES}}
 
@@ -421,30 +427,37 @@ representation makes the token <i>AFC</i> in the question reach into the context
 the game took place, it returns <i>Super Bowl 50</i>: the most salient span in the paragraph, which is what you
 get when a model has learned what answers look like but not what <i>this</i> question wants. The span head is
 reading a representation that was never asked to let the question interrogate the passage, and a linear layer
-on top cannot invent that behaviour. Fine-tuning is not an optimisation here; it is what creates the capability.</p>
+on top cannot invent that behaviour. The delivered model answers all five correctly. Fine-tuning is not an
+optimisation here; it is what creates the capability.</p>
 
-<p>The <b>exact-match / F1 spread</b> is the second diagnostic worth reading. The delivered model scores
-{{VAL_qa_best_secondary}} EM against {{VAL_qa_best}} F1, a 12-point gap, and the first sample prediction shows
-why: asked for the AFC team it returns <i>Denver Broncos defeated the National Football Conference (NFC)
-champion Carolina Panthers</i> — the answer is in there, with the boundary in the wrong place. That is a
-different disease from looking in the wrong place, and it is the one a model trained on 15 000 examples has.
-More data tightens boundaries; it is not what separates this model from the frozen one.</p>
+<p>The <b>exact-match / F1 spread</b> is the second diagnostic worth reading. Partial fine-tuning scores
+{{VAL_qa_partial_spread}} points more F1 than EM, and its predictions show why: asked for the AFC team it returns
+<i>Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers</i> — the answer is
+in there, with the boundary in the wrong place. That is a different disease from looking in the wrong place.
+Full fine-tuning narrows the spread to {{VAL_qa_best_spread}} points ({{VAL_qa_best_secondary}} EM against
+{{VAL_qa_best}} F1): the eight lower layers and the embeddings it adds buy tighter boundaries as well as better locations. What is
+left of the spread is the disease a model trained on 15 000 examples has; more data tightens boundaries, and it
+is not what separates this model from the frozen one.</p>
 
-<p><b>Why there is no full fine-tuning row for SQuAD.</b> It was attempted and did not complete. The local run
-was the heaviest in the grid — sequence length 384 with every parameter trainable — and a machine sleep during
-it pushed the process into swap, slowing it by two orders of magnitude; it was stopped rather than left to
-finish in days. Two further attempts on a GPU notebook failed on arguments that transformers 5 removed from
-<code>TrainingArguments</code>, which the code now tolerates. We did not re-run it a fourth time. The two
-methods that did complete satisfy the assignment's requirement of at least two per task, full fine-tuning is
-measured on the other three, and the table shows a dash rather than an estimate.</p>
+<p><b>Why the full fine-tuning row ran on different hardware.</b> It is the heaviest run in the grid — sequence
+length 384 with every parameter trainable — and the local attempt did not complete: a machine sleep during it
+pushed the process into swap, slowing it by two orders of magnitude, and it was stopped rather than left to finish
+in days. Two attempts on a GPU notebook then failed on arguments that transformers 5 removed from
+<code>TrainingArguments</code>, which the code now tolerates. The third, on a Colab T4 with the unchanged grid,
+completed, training in {{VAL_qa_full_min}} minutes. Mixing machines inside one comparison needs a check, and the same notebook
+supplied it: re-run on the T4, partial fine-tuning scored within 0.02 F1 of its local result, and no run in the
+grid moved by more than 0.3 points (<code>docs/replica_t4.md</code>). A {{VAL_qa_full_over_partial}}-point gap is not
+a hardware artefact.</p>
 
 <p><b>Delivered: {{VAL_qa_best_method}}, at {{VAL_qa_best}} F1 and {{VAL_qa_best_secondary}} exact match</b>,
-from 28.4 M trainable parameters. Two caveats stated plainly. First, this is below published SQuAD numbers for
-<code>bert-base</code> (around 88 F1), which is expected: we train on the 15 000-example subsample the
-assignment specifies, roughly a sixth of the corpus. Second, its development F1 was still climbing by 1.9
-points on the final epoch, so this run is under-trained rather than converged — the number is a floor for the
-method, not its ceiling. We report it as measured rather than extending the budget for one task and not the
-others.</p>
+from {{VAL_qa_best_trainable}} trainable parameters. Partial fine-tuning of the top four layers is
+{{VAL_qa_full_over_partial}} points behind with a quarter of the trainable weights — far outside the ±1–3 point
+seed band, so unlike AG News this is not a tie the cheaper option can claim. Two caveats stated plainly. First,
+this is below published SQuAD numbers for <code>bert-base</code> (around 88 F1), which is expected: we train on
+the 15 000-example subsample the assignment specifies, roughly a sixth of the corpus. Second, its development F1
+was still climbing on the final epoch ({{VAL_qa_full_last_gain}} points), so this run is under-trained rather than
+converged — the number is a floor for the method, not its ceiling. We report it as measured rather than extending
+the budget for one task and not the others.</p>
 
 
 <h2>7. Training diagnostics</h2>
@@ -466,18 +479,21 @@ weight decay stays at zero on biases and LayerNorm gains.</p>
 <p><b>The fine-tuned runs converged; several frozen ones did not.</b> By the last epoch the fine-tuned runs
 have flattened — partial fine-tuning on AG News moves {{VAL_flat_example}} on its final epoch, which is inside
 the noise band. The frozen probes are a different story: the AG News MLP probe was still gaining 1.06 points
-per epoch at epoch five, and the SQuAD partial run 1.9 points at epoch two. We report these as measured, with
+per epoch at epoch five, and both SQuAD fine-tuning runs were still gaining at epoch two
+({{VAL_qa_partial_last_gain}} F1 partial, {{VAL_qa_full_last_gain}} full). We report these as measured, with
 the budget fixed in advance for every method, and we flag them here rather than quietly giving the losing
 configurations extra epochs — which is the cheapest way to manufacture a comparison that says whatever you want.
 The practical consequence is that <b>the frozen numbers in this report are floors</b>: a longer schedule would
-lift them somewhat, and it would not close a 47-point gap on QA.</p>
+lift them somewhat, and it would not close a {{VAL_qa_gap_abs}}-point gap on QA.</p>
 
 <p><b>Cost scales with what carries a gradient, not with what runs forward.</b> Seconds per optimisation step
 group cleanly by rung — roughly 0.09–0.19 s frozen, 0.17–0.36 s partial, 0.45–0.74 s full on the token and
 sequence tasks. A frozen body still does a full forward pass, so the saving is the backward pass and the
 optimiser update, and it lands around 4–5× rather than the 30 000× the parameter counts might suggest. That
 gap between <i>parameters trained</i> and <i>time spent</i> is worth keeping in mind when a parameter count is
-used as a proxy for cost: it is a good proxy for memory and a poor one for wall clock.</p>
+used as a proxy for cost: it is a good proxy for memory and a poor one for wall clock. The SQuAD full
+fine-tuning row (†) ran on a T4 GPU, so its times sit on a different clock from every other row and are left out
+of these ranges.</p>
 
 
 {{TABLE_TIMING}}
@@ -485,7 +501,7 @@ used as a proxy for cost: it is a good proxy for memory and a poor one for wall 
 <h2>8. Analysis and trade-offs</h2>
 
 <p>Four tasks, one body, three rungs. The distance between a frozen BERT and the best thing we could train
-ranges from {{VAL_agnews_gap}} points to {{VAL_qa_gap}}. That is a factor of seventeen, on the same 110 M
+ranges from {{VAL_agnews_gap}} points to {{VAL_qa_gap}}. That is a factor of about {{VAL_gap_ratio}}, on the same 110 M
 parameters, and it is the central result of the assignment: <b>the value of fine-tuning is not a property of
 the model, it is a property of the task</b>, and there is no way to read it off a description of either.</p>
 
@@ -528,7 +544,8 @@ fit alongside a desktop.</p>
 <p>Partial fine-tuning is the interesting middle. On AG News it reached {{VAL_agnews_partial}}% against
 {{VAL_agnews_full}}% for full fine-tuning, a difference inside the seed band, for 13% of the trainable weights
 and 79% of the wall clock. On NER and POS the full model was ahead by more than noise. On POS it was ahead in
-a way accuracy alone would have hidden. There is no single answer, which is the point.</p>
+a way accuracy alone would have hidden. On SQuAD it was ahead by {{VAL_qa_full_over_partial}} points, the widest
+partial-to-full gap in the grid. There is no single answer, which is the point.</p>
 
 <h3>8.3 What we would question in our own results</h3>
 
@@ -546,9 +563,9 @@ a way accuracy alone would have hidden. There is no single answer, which is the 
 <li><b>SQuAD is trained on 15 000 of 87 599 examples</b>, so its absolute numbers sit well below published
   <code>bert-base</code> results. The comparison between methods is internally valid; the absolute figure is
   not comparable to the literature.</li>
-<li><b>SQuAD has no full fine-tuning run</b> (see 6.4). On the other three tasks full fine-tuning beat partial by
-  0.7–1.9 points, so the delivered QA model is very likely not the best one this body can produce. It is the
-  best one we measured.</li>
+<li><b>SQuAD's full fine-tuning run was trained on a different machine</b> from the other twenty (a Colab T4,
+  see 6.4). Its score is comparable — the same notebook re-ran the whole grid on the T4 and no run moved by more
+  than 0.3 points — but its wall-clock time is not, and it is marked † wherever a time is shown.</li>
 <li><b>"Frozen" turned out to be ambiguous</b>, and expensively so. Whether BERT's pooler counts as body or as
   head moved AG News by {{VAL_agnews_pooler_gap}} points — more than the entire distance from feature-based to
   full fine-tuning on that task. Any comparison of adaptation methods should say where it draws that line.</li>
@@ -588,7 +605,10 @@ methods we tried for that task</b>, intended use, limitations and bias, and refe
 <code>seed</code> and <code>data_seed</code>, so head initialisation and shuffling repeat. The dataset subsamples
 (AG News 20 000 rows and its 5 000-row dev split, SQuAD 15 000 rows) come from seeded shuffles, so a replica sees
 the same rows and not merely the same number of rows. Dependencies are pinned in <code>requirements.txt</code> at
-the exact versions used. Reductions on GPU and MPS are not bit-exact, so the last decimal may move.</p>
+the exact versions used. Reductions on GPU and MPS are not bit-exact, so the last decimal may move — and not
+much more than that: a teammate re-ran the complete grid on a Colab T4, with a different device, torch build and
+reduced-precision format, and every run landed within 0.3 points of the numbers in this report
+(<code>docs/replica_t4.md</code>).</p>
 
 <pre>python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/sanity_check.py       # subword/label alignment, before any training

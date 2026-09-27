@@ -50,3 +50,18 @@ done qa partial_ft4_linear_bert-base-uncased [29.5 min] {'exact_match': 60.681, 
 skip qa frozen_linear_bert-base-uncased
 skip qa partial_ft4_linear_bert-base-uncased
 ```
+
+The local SQuAD full fine-tuning run above never finished (see section 6.4 of the report).
+
+## Colab T4, 2026-09-25
+
+`notebooks/U2T01_colab.ipynb`, run by a teammate on a Tesla T4 (torch 2.11.0+cu128, fp16).
+It ran the complete grid from scratch; only the run that has no local result was adopted into
+`results/`. The other twenty are compared with their local twins in `docs/replica_t4.md`.
+
+```
+[grid] 21 runs
+...
+done   qa      full_ft_linear_bert-base-uncased  [9.5 min]  {'exact_match': 72.772, 'f1': 82.137, 'n_questions': 10570}
+[grid] finished with 0 failure(s)
+```

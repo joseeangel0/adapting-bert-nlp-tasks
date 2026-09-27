@@ -82,10 +82,20 @@ def card(row: dict, repo: str, task: str) -> str:
         f"      - type: {k}\n        value: {pct(m[k])}\n        name: {n}"
         for k, n in ((hkey, hname), (skey, sname)) if k in m)
 
+    runs = [r for r in rows(task) if r["headline"] is not None]
+    here = rec["env"].get("chip", rec["env"].get("device"))
+    elsewhere = {r["run_id"]: r["raw"]["env"].get("chip", r["raw"]["env"].get("device"))
+                 for r in runs if r["raw"]["env"].get("chip", r["raw"]["env"].get("device")) != here}
     comparison = "\n".join(
-        f"| {r['method']} | {r['trainable']:,} | {r['trainable_pct']}% | "
-        f"{r['headline']:.2f} | {r['secondary']:.2f} | {r['minutes']:.1f} |"
-        for r in rows(task) if r["headline"] is not None)
+        f"| {r['method']}{' †' if r['run_id'] in elsewhere else ''} | {r['trainable']:,} | "
+        f"{r['trainable_pct']}% | {r['headline']:.2f} | {r['secondary']:.2f} | {r['minutes']:.1f} |"
+        for r in runs)
+    hw_note = ("\n\n† trained on " + ", ".join(sorted(set(elsewhere.values())))
+               + f" instead of {here}. Scores compare across machines; training times do not."
+               if elsewhere else "")
+    accum = hp.get("grad_accum") or 1
+    batch = (f"{hp.get('batch_size')} x {accum} accumulation steps "
+             f"(effective {hp.get('batch_size') * accum})" if accum > 1 else f"{hp.get('batch_size')}")
 
     labels = ds.get("labels") or []
     label_block = ("\n".join(f"- `{i}` `{l}`" for i, l in enumerate(labels))
@@ -149,7 +159,7 @@ language or domain other than the one above.
 | Trainable parameters | {params.get('trainable_params', 0):,} of {params.get('total_params', 0):,} ({params.get('trainable_pct', 0)}%) |
 | Head learning rate | {hp.get('head_lr')} |
 | Encoder learning rate | {hp.get('body_lr')} |
-| Epochs / batch size | {hp.get('epochs')} / {hp.get('batch_size')} |
+| Epochs / batch size | {hp.get('epochs')} / {batch} |
 | Max sequence length | {hp.get('max_length')} |
 | Scheduler | {hp.get('scheduler', 'linear with 10% warmup')} |
 | Seed | {rec['seed']} |
@@ -173,7 +183,7 @@ Held-out test split, never seen during training or model selection.
 
 | Method | Trainable params | Share of model | {hname} | {sname} | Train time (min) |
 |---|---:|---:|---:|---:|---:|
-{comparison}
+{comparison}{hw_note}
 
 Single run per configuration with a fixed seed. Re-running with a different seed moves these
 numbers by roughly +/- 1-3 points, so gaps smaller than that are noise rather than findings.

@@ -23,7 +23,7 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
 | 1.5 | QA extractivo: SQuAD v1.1, submuestra de ~15 k | `rajpurkar/squad`, 15 000 de entrenamiento con semilla; evaluación sobre las 10 570 preguntas de validación (el test de SQuAD no es público) | `results/qa/*.json` | ✅ |
 | 1.6 | La etiqueta va en el primer sub-token; `-100` en el resto | `src/encoding.py::align_labels`, usado por NER, POS y —en su forma de span— por QA | `sanity_check.txt`; `data_checks.md`: invariantes en 1 000 oraciones por tarea | ✅ |
 | 1.7 | Imprimir un batch con tokens junto a sus etiquetas antes de entrenar | `scripts/sanity_check.py`, ejecutado antes de la parrilla | `sanity_check.txt` | ✅ |
-| 1.8 | `bert-base` como cuerpo de los modelos entregados | `configs/experiments.py::BODY = "bert-base-uncased"` | los 20 runs de `GRID` usan ese cuerpo | ✅ |
+| 1.8 | `bert-base` como cuerpo de los modelos entregados | `configs/experiments.py::BODY = "bert-base-uncased"` | los 21 runs de `GRID` usan ese cuerpo | ✅ |
 | 1.9 | *(Opcional)* DistilBERT / BERT-large como benchmark de tamaño | `configs/experiments.py::OPTIONAL`, `run_experiments.py --optional` | `results/*/…distilbert…json` | — no ejecutado (el enunciado lo marca como opcional; el tiempo de GPU se destinó a cubrir los tres escalones en las cuatro tareas). `run_experiments.py --optional` lo corre. |
 | 1.10 | HuggingFace Transformers, Tokenizers, Datasets y `Trainer` | `datasets.load_dataset`, `AutoTokenizer` rápido (los `word_ids()` son la base de la alineación), `Trainer` con subclases propias | `requirements.txt` con versiones fijas | ✅ |
 
@@ -47,7 +47,7 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
 |---|---|---|---|---|
 | 3.1 | Métricas adecuadas por tarea, justificadas | accuracy + macro-F1 (AG News), F1 de entidad con seqeval + accuracy de token (NER), accuracy de token + macro-F1 sobre 17 etiquetas (POS), EM + F1 con la normalización oficial (SQuAD) | `src/metrics.py`; tabla de justificación en la sección 5 del reporte | ✅ |
 | 3.2 | Métricas de entrenamiento para depurar el avance: loss, scores por época, segundos por paso/época | `Trainer` con `logging_steps=50` y `eval_strategy="epoch"`; `EpochTimer` mide segundos por época y por paso | cada `results/*.json` lleva `train_log`, `epoch_times`, `train_seconds`, `eval_seconds`; figura 3 y tabla de tiempos del reporte | ✅ |
-| 3.3 | Los resultados se probarán contra el modelo y contra una réplica del profesor | semillas fijas (Python, NumPy, torch, `seed` y `data_seed` de `TrainingArguments`), submuestras derivadas de shuffles con semilla, dependencias fijadas, y un verificador que recarga cada checkpoint y recalcula su métrica | `model_checks.md`; sección 10 del reporte | ✅ |
+| 3.3 | Los resultados se probarán contra el modelo y contra una réplica del profesor | semillas fijas (Python, NumPy, torch, `seed` y `data_seed` de `TrainingArguments`), submuestras derivadas de shuffles con semilla, dependencias fijadas, y un verificador que recarga cada checkpoint y recalcula su métrica | `model_checks.md`; [`replica_t4.md`](replica_t4.md): la parrilla completa re-corrida en un Colab T4 (otro dispositivo, otro build de torch, fp16 en vez de bf16) — los 20 runs compartidos quedan a ≤ 0.3 puntos; sección 10 del reporte | ✅ |
 
 ### Parte 4 — Reporte
 
@@ -95,4 +95,11 @@ correr con un comando. Las comprobaciones de datos y de checkpoints se generan s
    los offsets, así que `Trainer` llama a `compute_metrics` en la propia pasada de evaluación y de ahí salen EM,
    F1 y la loss; con dos pasadas se pagaba el doble por época sin obtener nada más.
 6. **Atención *eager* en MPS.** El kernel fusionado de atención de MPS no soporta dropout; en CUDA el mismo código
-   conserva la ruta rápida. `bfloat16` está activo en todos los runs y duplica el throughput en este equipo.
+   conserva la ruta rápida. `bfloat16` está activo en todos los runs locales y duplica el throughput en este
+   equipo; en el T4, que no tiene `bfloat16`, `src/common.py::precision_flags` cae solo a `float16`.
+7. **El full fine-tuning de SQuAD se entrenó en un Colab T4.** El intento local no terminó (el equipo se durmió y
+   el proceso cayó a swap) y dos intentos en notebook fallaron por argumentos que transformers 5 quitó de
+   `TrainingArguments`. El tercero, en `notebooks/U2T01_colab.ipynb`, completó: 82.14 F1 contra 72.91 del partial,
+   así que es el modelo entregado. Mezclar máquinas en una comparación se justificó con datos: el mismo notebook
+   re-corrió partial en el T4 y quedó a 0.02 F1 del resultado local ([`replica_t4.md`](replica_t4.md)). Los tiempos
+   de ese run no son comparables y el reporte los marca con †.

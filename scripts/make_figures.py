@@ -23,6 +23,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -169,6 +170,7 @@ def fig_curves(data):
         ax_loss.set_xlabel("Optimisation step")
         ax_score.set_ylabel(f"Dev {HEADLINE[task][1].lower()} (%)" if col == 0 else "")
         ax_score.set_xlabel("Epoch")
+        ax_score.xaxis.set_major_locator(MaxNLocator(integer=True))
         for ax in (ax_loss, ax_score):
             _clean(ax, xgrid=False)
     _legend(fig, ["frozen", "partial", "full"], bbox_to_anchor=(0.5, -0.06))

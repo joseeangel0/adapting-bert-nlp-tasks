@@ -24,16 +24,16 @@ model-index:
         type: rajpurkar/squad
       metrics:
       - type: f1
-        value: 72.91
+        value: 82.14
         name: F1
       - type: exact_match
-        value: 60.68
+        value: 72.77
         name: Exact match
 ---
 
 # joseeangel/bert-base-uncased-squad-qa
 
-`bert-base-uncased` adapted to **Extractive QA (SQuAD v1.1)** with **Partial FT (top 4 layers)**.
+`bert-base-uncased` adapted to **Extractive QA (SQuAD v1.1)** with **Full fine-tuning**.
 
 Produced for the assignment *U2T01 - Adapting BERT for NLP tasks* (Trends in Data Science).
 The delivered method was chosen by measurement, not by default: the table below is the full
@@ -57,16 +57,16 @@ language or domain other than the one above.
 
 | | |
 |---|---|
-| Method | Partial FT (top 4 layers) |
-| Trainable parameters | 28,353,026 of 108,893,186 (26.037%) |
+| Method | Full fine-tuning |
+| Trainable parameters | 108,893,186 of 108,893,186 (100.0%) |
 | Head learning rate | 0.001 |
 | Encoder learning rate | 3e-05 |
-| Epochs / batch size | 2 / 16 |
+| Epochs / batch size | 2 / 8 x 2 accumulation steps (effective 16) |
 | Max sequence length | 384 |
 | Scheduler | linear with 10% warmup |
 | Seed | 42 |
-| Hardware | Apple M5 (mps) |
-| Wall-clock training time | 25.7 min |
+| Hardware | Tesla T4 (cuda) |
+| Wall-clock training time | 8.3 min |
 
 A freshly initialised head and pretrained encoder weights are trained in **two parameter
 groups with separate learning rates**; a single shared rate either starves the head or
@@ -78,15 +78,18 @@ Held-out test split, never seen during training or model selection.
 
 | Metric | Value |
 |---|---|
-| **F1** | **72.91** |
-| Exact match | 60.68 |
+| **F1** | **82.14** |
+| Exact match | 72.77 |
 
 ### What every method scored on this task
 
 | Method | Trainable params | Share of model | F1 | Exact match | Train time (min) |
 |---|---:|---:|---:|---:|---:|
-| Feature-based (linear probe) | 1,538 | 0.001% | 25.18 | 16.20 | 25.0 |
-| Partial FT (top 4 layers) | 28,353,026 | 26.037% | 72.91 | 60.68 | 25.7 |
+| Feature-based (linear probe) † | 1,538 | 0.001% | 25.18 | 16.20 | 25.0 |
+| Partial FT (top 4 layers) † | 28,353,026 | 26.037% | 72.91 | 60.68 | 25.7 |
+| Full fine-tuning | 108,893,186 | 100.0% | 82.14 | 72.77 | 8.3 |
+
+† trained on Apple M5 instead of Tesla T4. Scores compare across machines; training times do not.
 
 Single run per configuration with a fixed seed. Re-running with a different seed moves these
 numbers by roughly +/- 1-3 points, so gaps smaller than that are noise rather than findings.

@@ -14,6 +14,7 @@ import argparse
 import json
 import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +34,31 @@ def lower_metric(name: str) -> str:
 
 def fmt(v, digits=2):
     return "-" if v is None else f"{v:.{digits}f}"
+
+
+def env_label(r: dict) -> str:
+    env = r["raw"]["env"]
+    return f"{env.get('chip', 'CPU')} - torch {env['torch']} on {env['device']}"
+
+
+@lru_cache(maxsize=None)
+def main_env() -> str:
+    """The environment most runs were trained on; anything else gets a dagger in the tables."""
+    labels = [env_label(r) for r in rows()]
+    return max(set(labels), key=labels.count)
+
+
+def hw_mark(r: dict) -> str:
+    return "<sup>†</sup>" if env_label(r) != main_env() else ""
+
+
+def hw_note(rs: list[dict]) -> str:
+    """Footnote for a table holding runs from more than one machine: their clocks don't compare."""
+    other = sorted({env_label(r) for r in rs if hw_mark(r)})
+    if not other:
+        return ""
+    return (f"<p class='small'>† trained on {', '.join(other)} instead of {main_env()}. Its scores "
+            "compare with the other rows; its wall-clock times do not.</p>")
 
 
 def table_matrix() -> str:
@@ -71,12 +97,12 @@ def table_runs(task: str) -> str:
             f"<th class='n'>{hname}</th><th class='n'>{sname}</th>"
             f"<th class='n'>Train (min)</th></tr>")
     body = "".join(
-        f"<tr><td>{'<b>' if r is best else ''}{r['method']}{'</b>' if r is best else ''}</td>"
+        f"<tr><td>{'<b>' if r is best else ''}{r['method']}{'</b>' if r is best else ''}{hw_mark(r)}</td>"
         f"<td class='n'>{r['trainable']:,}</td><td class='n'>{r['trainable_pct']}%</td>"
         f"<td class='n {'best' if r is best else ''}'>{fmt(r['headline'])}</td>"
         f"<td class='n'>{fmt(r['secondary'])}</td><td class='n'>{r['minutes']:.1f}</td></tr>"
         for r in rs)
-    return f'<table><thead>{head}</thead><tbody>{body}</tbody></table>'
+    return f'<table><thead>{head}</thead><tbody>{body}</tbody></table>{hw_note(rs)}'
 
 
 def table_delivered() -> str:
@@ -117,29 +143,41 @@ def table_timing() -> str:
     head = ("<tr><th>Task</th><th>Method</th><th class='n'>sec / epoch</th>"
             "<th class='n'>sec / step</th><th class='n'>Total train (min)</th>"
             "<th class='n'>Test eval (s)</th></tr>")
-    body = []
+    body, timed = [], []
     for r in rows():
         ets = [e for e in r["raw"].get("epoch_times", []) if "sec_per_step" in e]
         if not ets:
             continue
+        timed.append(r)
         sec_epoch = sum(e["seconds"] for e in ets) / len(ets)
         sec_step = sum(e["sec_per_step"] for e in ets) / len(ets)
-        body.append(f"<tr><td>{TASK_TITLES[r['task']].split(' (')[0]}</td><td>{r['method']}</td>"
+        body.append(f"<tr><td>{TASK_TITLES[r['task']].split(' (')[0]}</td><td>{r['method']}{hw_mark(r)}</td>"
                     f"<td class='n'>{sec_epoch:.0f}</td><td class='n'>{sec_step:.3f}</td>"
                     f"<td class='n'>{r['minutes']:.1f}</td>"
                     f"<td class='n'>{r['raw'].get('eval_seconds', 0):.0f}</td></tr>")
-    return f'<table><thead>{head}</thead><tbody>{"".join(body)}</tbody></table>'
+    return f'<table><thead>{head}</thead><tbody>{"".join(body)}</tbody></table>{hw_note(timed)}'
 
 
 def table_qa_examples() -> str:
+    """The same questions answered by the best frozen run and by the delivered one, side by side:
+    the prose in 6.4 describes the frozen model's mistakes, so they have to be on the page."""
     best = best_per_task().get("qa")
-    samples = (best or {}).get("raw", {}).get("metrics", {}).get("sample_predictions") or []
-    if not samples:
+    frozen = [r for r in rows("qa") if r["rung"] == "frozen" and r["headline"] is not None]
+    if not best or not frozen:
         return ""
-    body = "".join(f"<tr><td>{s['question']}</td><td>{s['gold']}</td><td>{s['predicted']}</td></tr>"
-                   for s in samples)
+    frozen = max(frozen, key=lambda r: r["headline"])
+    delivered = best["raw"]["metrics"].get("sample_predictions") or []
+    answered = {s["question"]: s["predicted"]
+                for s in frozen["raw"]["metrics"].get("sample_predictions") or []}
+    if not delivered:
+        return ""
+    body = "".join(f"<tr><td>{s['question']}</td><td>{s['gold']}</td>"
+                   f"<td>{answered.get(s['question'], '—')}</td><td>{s['predicted']}</td></tr>"
+                   for s in delivered)
     return ('<table class="keep"><thead><tr><th>Question</th><th>Gold answer</th>'
-            f'<th>Predicted span</th></tr></thead><tbody>{body}</tbody></table>')
+            f'<th>{frozen["method"].replace("Feature-based (", "Frozen (")}</th>'
+            f'<th>Delivered ({best["method"]})</th></tr></thead>'
+            f'<tbody>{body}</tbody></table>')
 
 
 def table_hub() -> str:
@@ -191,13 +229,19 @@ def values() -> dict[str, str]:
                 out[f"VAL_{task}_{rung}"] = fmt(top["headline"])
                 out[f"VAL_{task}_{rung}_method"] = top["method"]
                 out[f"VAL_{task}_{rung}_min"] = f"{top['minutes']:.1f}"
-        # The gap is best-known-method minus best-frozen, not full minus frozen: on SQuAD the
-        # best method we measured is partial fine-tuning, and quoting a missing run would be worse
-        # than quoting the one that won.
+        # The gap is best-known-method minus best-frozen, not full minus frozen, so a task where
+        # a cheaper rung wins (or the full run is missing) never quotes a number it doesn't have.
         if f"VAL_{task}_frozen" in out:
             gap = b["headline"] - float(out[f"VAL_{task}_frozen"])
             out[f"VAL_{task}_gap"] = f"{gap:+.1f}"
+            out[f"VAL_{task}_gap_abs"] = f"{gap:.0f}"
         out[f"VAL_{task}_best_secondary"] = fmt(b["secondary"])
+        out[f"VAL_{task}_best_trainable"] = f"{b['trainable'] / 1e6:.1f} M"
+        if f"VAL_{task}_partial" in out and f"VAL_{task}_full" in out:
+            out[f"VAL_{task}_full_over_partial"] = (
+                f"{float(out[f'VAL_{task}_full']) - float(out[f'VAL_{task}_partial']):.1f}")
+    if "VAL_qa_gap" in out and "VAL_agnews_gap" in out:
+        out["VAL_gap_ratio"] = f"{float(out['VAL_qa_gap']) / float(out['VAL_agnews_gap']):.0f}"
     # Specific runs the prose names directly, looked up by run id so a sentence can never
     # quote a number that belongs to a different experiment.
     by_id = {(r["task"], r["run_id"]): r for r in data}
@@ -226,6 +270,20 @@ def values() -> dict[str, str]:
         ev = [e["eval_accuracy"] for e in flat["raw"]["train_log"] if "eval_accuracy" in e]
         out["VAL_flat_example"] = (f"{(ev[-1] - ev[-2]) * 100:+.2f} points" if len(ev) > 1 else "—")
 
+    def last_epoch_gain(task: str, run_id: str, key: str) -> str:
+        r = by_id.get((task, run_id))
+        ev = [e[key] for e in r["raw"]["train_log"] if key in e] if r else []
+        return f"{ev[-1] - ev[-2]:+.1f}" if len(ev) > 1 else "—"
+
+    out["VAL_qa_partial_last_gain"] = last_epoch_gain("qa", "partial_ft4_linear_bert-base-uncased", "eval_f1")
+    out["VAL_qa_full_last_gain"] = last_epoch_gain("qa", "full_ft_linear_bert-base-uncased", "eval_f1")
+    qa_partial = by_id.get(("qa", "partial_ft4_linear_bert-base-uncased"))
+    if qa_partial:
+        out["VAL_qa_partial_spread"] = f"{qa_partial['headline'] - qa_partial['secondary']:.1f}"
+    qa_best = best.get("qa")
+    if qa_best:
+        out["VAL_qa_best_spread"] = f"{qa_best['headline'] - qa_best['secondary']:.1f}"
+
     out["VAL_pos_sk_macro"] = one("pos", "frozen_sk-logreg_firstsub_bert-base-uncased", "secondary")
     out["VAL_pos_partial_macro"] = one("pos", "partial_ft2_linear_bert-base-uncased", "secondary")
     out["VAL_pos_full_macro"] = one("pos", "full_ft_linear_bert-base-uncased", "secondary")
@@ -233,8 +291,13 @@ def values() -> dict[str, str]:
     cfg = json.loads((ROOT / "configs" / "report.json").read_text())
     out["TEAM"] = " &middot; ".join(n.replace(" ", "&nbsp;") for n in cfg["team"])
     out["REPO_URL"] = cfg.get("repo_url") or "local repository (not published)"
-    env = data[0]["raw"]["env"]
-    out["VAL_env"] = f"{env.get('chip', 'CPU')} - torch {env['torch']} on {env['device']}"
+    out["VAL_env"] = main_env()
+    elsewhere = [r for r in data if hw_mark(r)]
+    out["VAL_env_main_runs"] = str(len(data) - len(elsewhere))
+    out["VAL_env_other"] = ", ".join(sorted({env_label(r) for r in elsewhere})) or "—"
+    counts = {env: sum(env_label(r) == env for r in elsewhere) for env in {env_label(r) for r in elsewhere}}
+    out["VAL_envs"] = main_env() + "".join(
+        f" + {env} ({n} run{'s' if n != 1 else ''})" for env, n in sorted(counts.items()))
     out["VAL_total_runs"] = str(len(data))
     out["VAL_total_minutes"] = f"{sum(r['minutes'] for r in data):.0f}"
     return out
