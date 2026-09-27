@@ -42,3 +42,16 @@ order of magnitude inside the ±1–3 point seed band. Two consequences:
   partial fine-tuning within 0.02 F1 of the local run, against a 9.2-point gap between partial and
   full fine-tuning. Wall-clock times are **not** comparable across the two machines, and the
   report marks the T4 row with † wherever a time is shown.
+
+## The adopted checkpoint, verified on both machines
+
+The notebook also reloaded every checkpoint it had saved and re-scored it on the T4: **15/15
+reproduced their metric exactly**, including SQuAD full fine-tuning at 82.137 F1 (Δ 0.0000).
+That is the checkpoint published as `joseeangel/bert-base-uncased-squad-qa`; its
+`model.safetensors` on the Hub has the same SHA-256 as the local copy
+(`af11e341…ad35d81e`).
+
+Re-scored on the Apple M5 instead, the same weights give 82.173 F1, a difference of 0.036
+points. Nothing changed but the evaluation device and with it the reduced-precision format
+(float16 on the T4, bfloat16 on MPS), which is enough to flip a handful of near-tied answer
+spans out of 10 570 questions. `docs/model_checks.md` records it as a cross-device row.
